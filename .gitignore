@@ -15,6 +15,10 @@ yarn-error.log*
 
 # environment variables
 .env*
+!.env.example
+
+# convex local
+.convex/
 
 # turbo
 .turbo

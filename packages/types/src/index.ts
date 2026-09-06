@@ -1,6 +1,23 @@
 export const BUSINESS_KINDS = ["food", "pharmacy"] as const
 export type BusinessKind = (typeof BUSINESS_KINDS)[number]
 
+export type DirectoryBusiness = {
+  id: string
+  slug: string
+  name: string
+  kind: BusinessKind
+  description: string
+  advantages: string
+  scope: string
+  productPitch: string
+  createdAt: string
+}
+
+export type CreateDirectoryBusinessInput = Omit<
+  DirectoryBusiness,
+  "id" | "createdAt"
+>
+
 export const ORDER_STATUSES = [
   "received",
   "accepted",
