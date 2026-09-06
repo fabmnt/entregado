@@ -1,0 +1,233 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select"
+import { Textarea } from "@workspace/ui/components/textarea"
+import Layout from "../layouts/main.astro"
+import {
+  createBusiness,
+  listBusinesses,
+  type FieldErrors,
+} from "../lib/businesses"
+
+const KIND_OPTIONS = [
+  { value: "food", label: "Comida" },
+  { value: "pharmacy", label: "Farmacia" },
+] as const
+
+type FormValues = {
+  slug: string
+  name: string
+  kind: string
+  description: string
+  advantages: string
+  scope: string
+  productPitch: string
+}
+
+const emptyForm: FormValues = {
+  slug: "",
+  name: "",
+  kind: "food",
+  description: "",
+  advantages: "",
+  scope: "",
+  productPitch: "",
+}
+
+let formValues = emptyForm
+let fieldErrors: FieldErrors = {}
+let formError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  formValues = {
+    slug: String(form.get("slug") ?? ""),
+    name: String(form.get("name") ?? ""),
+    kind: String(form.get("kind") ?? ""),
+    description: String(form.get("description") ?? ""),
+    advantages: String(form.get("advantages") ?? ""),
+    scope: String(form.get("scope") ?? ""),
+    productPitch: String(form.get("productPitch") ?? ""),
+  }
+
+  const result = await createBusiness(formValues)
+  if (result.ok) {
+    return Astro.redirect("/admin", 303)
+  }
+
+  formError = result.error
+  fieldErrors = result.fieldErrors
+}
+
+const listed = await listBusinesses()
+---
+
+<Layout>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex flex-col gap-1">
+      <h1 class="text-xl font-medium">Negocios</h1>
+      <p class="text-sm text-muted-foreground">
+        Alta temporal para desarrollo. Esta página no tiene acceso restringido.
+      </p>
+    </header>
+
+    {
+      listed.length === 0 ? (
+        <p class="text-sm text-muted-foreground">Todavía no hay negocios.</p>
+      ) : (
+        <ul class="flex flex-col gap-3">
+          {listed.map((business) => (
+            <li class="flex flex-col gap-0.5 border-b border-border pb-3">
+              <span class="text-sm font-medium">{business.name}</span>
+              <span class="text-sm text-muted-foreground">
+                {business.kind === "pharmacy" ? "Farmacia" : "Comida"} ·{" "}
+                {business.slug}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <form method="post" class="flex flex-col gap-5">
+      <h2 class="text-sm font-medium">Nuevo negocio</h2>
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={formValues.name}
+            aria-invalid={fieldErrors.name ? true : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError>{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.slug ? true : undefined}>
+          <FieldLabel htmlFor="slug">Slug</FieldLabel>
+          <Input
+            id="slug"
+            name="slug"
+            defaultValue={formValues.slug}
+            aria-invalid={fieldErrors.slug ? true : undefined}
+          />
+          <FieldDescription>
+            Va a ser el subdominio. Solo minúsculas, números y guiones.
+          </FieldDescription>
+          {
+            fieldErrors.slug ? (
+              <FieldError>{fieldErrors.slug}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.kind ? true : undefined}>
+          <FieldLabel htmlFor="kind">Tipo</FieldLabel>
+          <NativeSelect
+            id="kind"
+            name="kind"
+            className="w-full"
+            defaultValue={formValues.kind || "food"}
+            aria-invalid={fieldErrors.kind ? true : undefined}
+          >
+            {
+              KIND_OPTIONS.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))
+            }
+          </NativeSelect>
+          {
+            fieldErrors.kind ? (
+              <FieldError>{fieldErrors.kind}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.description ? true : undefined}>
+          <FieldLabel htmlFor="description">Descripción</FieldLabel>
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={formValues.description}
+            aria-invalid={fieldErrors.description ? true : undefined}
+          />
+          {
+            fieldErrors.description ? (
+              <FieldError>{fieldErrors.description}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.advantages ? true : undefined}>
+          <FieldLabel htmlFor="advantages">Ventajas</FieldLabel>
+          <Textarea
+            id="advantages"
+            name="advantages"
+            defaultValue={formValues.advantages}
+            aria-invalid={fieldErrors.advantages ? true : undefined}
+          />
+          {
+            fieldErrors.advantages ? (
+              <FieldError>{fieldErrors.advantages}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.scope ? true : undefined}>
+          <FieldLabel htmlFor="scope">Alcance</FieldLabel>
+          <Textarea
+            id="scope"
+            name="scope"
+            defaultValue={formValues.scope}
+            aria-invalid={fieldErrors.scope ? true : undefined}
+          />
+          <FieldDescription>
+            Zona, horario o a quién llega el negocio. Sin mapa todavía.
+          </FieldDescription>
+          {
+            fieldErrors.scope ? (
+              <FieldError>{fieldErrors.scope}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.productPitch ? true : undefined}>
+          <FieldLabel htmlFor="productPitch">Qué vende</FieldLabel>
+          <Textarea
+            id="productPitch"
+            name="productPitch"
+            defaultValue={formValues.productPitch}
+            aria-invalid={fieldErrors.productPitch ? true : undefined}
+          />
+          <FieldDescription>
+            Una frase de promoción. No listes el catálogo.
+          </FieldDescription>
+          {
+            fieldErrors.productPitch ? (
+              <FieldError>{fieldErrors.productPitch}</FieldError>
+            ) : null
+          }
+        </Field>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit">Guardar</button>
+    </form>
+  </main>
+</Layout>

@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/convex/schemas/convex.schema.json",
+  "aiFiles": {
+    "enabled": true,
+    "skills": {
+      "agents": ["cursor"]
+    }
+  }
+}
