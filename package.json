@@ -5,8 +5,9 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "dev:web": "turbo dev --filter=web",
-    "dev:business": "turbo dev --filter=business",
+    "dev:backend": "turbo dev --filter=@entregado/backend",
+    "dev:web": "pnpm --filter @entregado/backend run dev:web",
+    "dev:business": "turbo dev --filter=business --filter=@entregado/backend",
     "lint": "turbo lint",
     "format": "turbo format",
     "format:check": "turbo format:check",

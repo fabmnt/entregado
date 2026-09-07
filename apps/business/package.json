@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^5",
+    "@entregado/backend": "workspace:*",
     "@entregado/types": "workspace:*",
     "@entregado/utils": "workspace:*",
     "@types/react": "^19",

@@ -4,5 +4,5 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 .pnpm-store/
-apps/web/convex/_generated/
-apps/web/.agents/
+packages/backend/convex/_generated/
+packages/backend/.agents/

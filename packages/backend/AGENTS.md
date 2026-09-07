@@ -1,3 +1,9 @@
+# Backend
+
+Un solo deployment Convex para `apps/web` y `apps/business`. Todos los negocios
+comparten estas tablas; el aislamiento es por filas (dueño, slug o id de
+negocio), no con otro proyecto Convex ni otro deploy.
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

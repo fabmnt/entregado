@@ -1,5 +1,5 @@
+import { api } from "@entregado/backend"
 import { ConvexHttpClient } from "convex/browser"
-import { api } from "../../convex/_generated/api"
 
 function getConvexUrl(): string {
   const url = import.meta.env.PUBLIC_CONVEX_URL ?? import.meta.env.CONVEX_URL

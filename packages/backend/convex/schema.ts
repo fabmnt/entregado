@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
+// Shared platform database. Many businesses share these tables; isolate
+// tenant data with owner, slug, or business id. Do not add a Convex app
+// per business.
+
 export const businessKind = v.union(v.literal("food"), v.literal("pharmacy"))
 export const userKind = v.union(v.literal("admin"), v.literal("business_owner"))
 
