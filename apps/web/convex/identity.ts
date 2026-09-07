@@ -2,8 +2,7 @@ import { ConvexError, v } from "convex/values"
 import { authComponent } from "./auth"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { query } from "./_generated/server"
-
-export const userKind = v.union(v.literal("admin"), v.literal("business_owner"))
+import { userKind } from "./schema"
 
 export const signedInUser = v.object({
   tokenIdentifier: v.string(),
@@ -19,23 +18,6 @@ type SignedInUser = {
   kind: "admin" | "business_owner"
 }
 
-function generalAdminEmails(): Set<string> {
-  const raw = process.env.GENERAL_ADMIN_EMAILS ?? ""
-  return new Set(
-    raw
-      .split(",")
-      .map((value: string) => value.trim().toLowerCase())
-      .filter((value: string) => value.length > 0)
-  )
-}
-
-export function kindForEmail(email: string): SignedInUser["kind"] {
-  if (generalAdminEmails().has(email.toLowerCase())) {
-    return "admin"
-  }
-  return "business_owner"
-}
-
 export async function getSignedInUser(
   ctx: QueryCtx | MutationCtx
 ): Promise<SignedInUser | null> {
@@ -49,11 +31,16 @@ export async function getSignedInUser(
     return null
   }
 
+  const profile = await ctx.db
+    .query("users")
+    .withIndex("by_auth_user", (q) => q.eq("authUserId", user._id))
+    .unique()
+
   return {
     tokenIdentifier: identity.tokenIdentifier,
     email: user.email,
     name: user.name ?? "",
-    kind: kindForEmail(user.email),
+    kind: profile?.kind ?? "business_owner",
   }
 }
 

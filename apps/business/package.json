@@ -11,7 +11,7 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx,astro}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,astro}\"",
-    "typecheck": "astro check"
+    "typecheck": "tsc --noEmit && astro check"
   },
   "dependencies": {
     "@astrojs/react": "^5",

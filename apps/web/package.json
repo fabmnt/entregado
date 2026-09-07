@@ -12,7 +12,7 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx,astro}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,astro}\"",
-    "typecheck": "astro check"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex && astro check"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.5",
