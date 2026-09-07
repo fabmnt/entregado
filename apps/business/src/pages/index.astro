@@ -1,16 +1,3 @@
 ---
-import Layout from "../layouts/main.astro"
+return Astro.redirect("/admin", 302)
 ---
-
-<Layout>
-  <main
-    class="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-3 p-6"
-  >
-    <h1 class="text-xl font-medium">Tu negocio en Entregado</h1>
-    <p class="text-sm leading-relaxed text-muted-foreground">
-      Tienda y panel de este negocio. Todos los locales usan esta misma
-      aplicación; acá vas a ver solo el tuyo. El catálogo, los pedidos y los
-      administradores van a vivir acá.
-    </p>
-  </main>
-</Layout>

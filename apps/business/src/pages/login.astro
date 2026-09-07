@@ -38,8 +38,7 @@ if (Astro.request.method === "POST") {
       parsed.data
     )
     if (response.ok) {
-      const nextResponse = redirectWithCookies("/admin", response)
-      return nextResponse
+      return redirectWithCookies("/admin", response)
     }
     formError = await authErrorMessage(response)
   }

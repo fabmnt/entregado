@@ -1,0 +1,271 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import { Textarea } from "@workspace/ui/components/textarea"
+import { nicaraguaLocalDigits } from "@entregado/utils"
+import AdminNav from "../../../components/admin-nav.astro"
+import Layout from "../../../layouts/main.astro"
+import {
+  getManagedBusiness,
+  updateBusinessProfile,
+  type ProfileFieldErrors,
+} from "../../../lib/businesses"
+import { imageFieldError, isFilledFile, uploadImage } from "../../../lib/images"
+
+const slug = Astro.params.slug
+const token = Astro.locals.convexToken
+
+if (!slug || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+let formValues = {
+  name: business.name,
+  description: business.description,
+  advantages: business.advantages,
+  scope: business.scope,
+  productPitch: business.productPitch,
+  whatsapp: business.whatsapp ? nicaraguaLocalDigits(business.whatsapp) : "",
+  phone: business.phone ? nicaraguaLocalDigits(business.phone) : "",
+  address: business.address ?? "",
+  hours: business.hours ?? "",
+}
+let fieldErrors: ProfileFieldErrors = {}
+let formError = ""
+let saved = false
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  formValues = {
+    name: String(form.get("name") ?? ""),
+    description: String(form.get("description") ?? ""),
+    advantages: String(form.get("advantages") ?? ""),
+    scope: String(form.get("scope") ?? ""),
+    productPitch: String(form.get("productPitch") ?? ""),
+    whatsapp: String(form.get("whatsapp") ?? ""),
+    phone: String(form.get("phone") ?? ""),
+    address: String(form.get("address") ?? ""),
+    hours: String(form.get("hours") ?? ""),
+  }
+
+  const clearLogo = form.get("clearLogo") === "on"
+  const logo = form.get("logo")
+  let logoStorageId: Awaited<ReturnType<typeof uploadImage>> | undefined
+  let skipSave = false
+
+  if (isFilledFile(logo)) {
+    const imageError = imageFieldError(logo)
+    if (imageError) {
+      formError = imageError
+      skipSave = true
+    } else {
+      logoStorageId = await uploadImage(logo, token)
+    }
+  }
+
+  if (!skipSave) {
+    const result = await updateBusinessProfile(slug, formValues, token, {
+      logoStorageId,
+      clearLogo,
+    })
+    if (result.ok) {
+      saved = true
+      formValues = {
+        name: result.business.name,
+        description: result.business.description,
+        advantages: result.business.advantages,
+        scope: result.business.scope,
+        productPitch: result.business.productPitch,
+        whatsapp: result.business.whatsapp
+          ? nicaraguaLocalDigits(result.business.whatsapp)
+          : "",
+        phone: result.business.phone
+          ? nicaraguaLocalDigits(result.business.phone)
+          : "",
+        address: result.business.address ?? "",
+        hours: result.business.hours ?? "",
+      }
+    } else {
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    }
+  }
+}
+
+const kindLabel = business.kind === "pharmacy" ? "Farmacia" : "Comida"
+const currentLogo = saved
+  ? (await getManagedBusiness(slug, token))?.logoUrl
+  : business.logoUrl
+---
+
+<Layout title={`Negocio | ${business.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="profile" />
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="flex flex-col gap-5"
+    >
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : saved ? (
+          <p class="text-sm text-muted-foreground" role="status">
+            Guardado.
+          </p>
+        ) : null
+      }
+      <p class="text-sm text-muted-foreground">
+        {kindLabel} · /{business.slug} (no se pueden cambiar)
+      </p>
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={formValues.name}
+            aria-invalid={fieldErrors.name ? true : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError>{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.whatsapp ? true : undefined}>
+          <FieldLabel htmlFor="whatsapp">WhatsApp</FieldLabel>
+          <Input
+            id="whatsapp"
+            name="whatsapp"
+            inputMode="numeric"
+            defaultValue={formValues.whatsapp}
+            aria-invalid={fieldErrors.whatsapp ? true : undefined}
+          />
+          <FieldDescription>8 dígitos de Nicaragua.</FieldDescription>
+          {
+            fieldErrors.whatsapp ? (
+              <FieldError>{fieldErrors.whatsapp}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.phone ? true : undefined}>
+          <FieldLabel htmlFor="phone">Teléfono (opcional)</FieldLabel>
+          <Input
+            id="phone"
+            name="phone"
+            inputMode="numeric"
+            defaultValue={formValues.phone}
+            aria-invalid={fieldErrors.phone ? true : undefined}
+          />
+          {
+            fieldErrors.phone ? (
+              <FieldError>{fieldErrors.phone}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.address ? true : undefined}>
+          <FieldLabel htmlFor="address">Dirección (opcional)</FieldLabel>
+          <Textarea
+            id="address"
+            name="address"
+            defaultValue={formValues.address}
+            aria-invalid={fieldErrors.address ? true : undefined}
+          />
+        </Field>
+        <Field data-invalid={fieldErrors.hours ? true : undefined}>
+          <FieldLabel htmlFor="hours">Horario (opcional)</FieldLabel>
+          <Textarea
+            id="hours"
+            name="hours"
+            defaultValue={formValues.hours}
+            aria-invalid={fieldErrors.hours ? true : undefined}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="logo">Logo</FieldLabel>
+          {
+            currentLogo ? (
+              <img
+                src={currentLogo}
+                alt=""
+                class="mb-2 h-16 w-16 object-cover"
+              />
+            ) : null
+          }
+          <Input
+            id="logo"
+            name="logo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          />
+          <FieldDescription>JPG, PNG o WebP. Máximo 2 MB.</FieldDescription>
+        </Field>
+        {
+          currentLogo ? (
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="clearLogo" />
+              Quitar logo
+            </label>
+          ) : null
+        }
+        <Field data-invalid={fieldErrors.description ? true : undefined}>
+          <FieldLabel htmlFor="description">Descripción</FieldLabel>
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={formValues.description}
+            aria-invalid={fieldErrors.description ? true : undefined}
+          />
+          {
+            fieldErrors.description ? (
+              <FieldError>{fieldErrors.description}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.advantages ? true : undefined}>
+          <FieldLabel htmlFor="advantages">Ventajas</FieldLabel>
+          <Textarea
+            id="advantages"
+            name="advantages"
+            defaultValue={formValues.advantages}
+            aria-invalid={fieldErrors.advantages ? true : undefined}
+          />
+        </Field>
+        <Field data-invalid={fieldErrors.scope ? true : undefined}>
+          <FieldLabel htmlFor="scope">Alcance</FieldLabel>
+          <Textarea
+            id="scope"
+            name="scope"
+            defaultValue={formValues.scope}
+            aria-invalid={fieldErrors.scope ? true : undefined}
+          />
+        </Field>
+        <Field data-invalid={fieldErrors.productPitch ? true : undefined}>
+          <FieldLabel htmlFor="productPitch">Qué vende</FieldLabel>
+          <Textarea
+            id="productPitch"
+            name="productPitch"
+            defaultValue={formValues.productPitch}
+            aria-invalid={fieldErrors.productPitch ? true : undefined}
+          />
+        </Field>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit">Guardar</button>
+    </form>
+  </main>
+</Layout>

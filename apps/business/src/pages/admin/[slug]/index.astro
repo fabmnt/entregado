@@ -1,0 +1,47 @@
+---
+import AdminNav from "../../../components/admin-nav.astro"
+import Layout from "../../../layouts/main.astro"
+import { getManagedBusiness } from "../../../lib/businesses"
+
+const slug = Astro.params.slug
+const token = Astro.locals.convexToken
+
+if (!slug || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+---
+
+<Layout title={`${business.name} | Panel`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="home" />
+    <ul class="flex flex-col gap-3">
+      <li>
+        <a
+          href={`/admin/${business.slug}/products`}
+          class="text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Productos
+        </a>
+        <p class="text-sm text-muted-foreground">
+          Añade, edita u oculta lo que se ve en la tienda.
+        </p>
+      </li>
+      <li>
+        <a
+          href={`/admin/${business.slug}/profile`}
+          class="text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Negocio y contacto
+        </a>
+        <p class="text-sm text-muted-foreground">
+          Nombre, textos, WhatsApp, dirección y logo.
+        </p>
+      </li>
+    </ul>
+  </main>
+</Layout>

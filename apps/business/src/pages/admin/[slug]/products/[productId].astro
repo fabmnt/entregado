@@ -1,0 +1,217 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import { Textarea } from "@workspace/ui/components/textarea"
+import AdminNav from "../../../../components/admin-nav.astro"
+import Layout from "../../../../layouts/main.astro"
+import { getManagedBusiness } from "../../../../lib/businesses"
+import {
+  imageFieldError,
+  isFilledFile,
+  uploadImage,
+} from "../../../../lib/images"
+import {
+  deleteProduct,
+  getManagedProduct,
+  updateProduct,
+  type ProductFieldErrors,
+} from "../../../../lib/products"
+
+const slug = Astro.params.slug
+const productIdParam = Astro.params.productId
+const token = Astro.locals.convexToken
+
+if (!slug || !productIdParam || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const productId = productIdParam as Id<"products">
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+const product = await getManagedProduct(slug, productId, token)
+if (!product) {
+  return new Response(null, { status: 404 })
+}
+
+let formValues = {
+  name: product.name,
+  description: product.description,
+  price: String(product.price),
+  available: product.available,
+}
+let photoUrl = product.photoUrl
+let fieldErrors: ProductFieldErrors = {}
+let formError = ""
+let saved = false
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const intent = String(form.get("intent") ?? "save")
+
+  if (intent === "delete") {
+    await deleteProduct(slug, productId, token)
+    return Astro.redirect(`/admin/${slug}/products`, 303)
+  }
+
+  formValues = {
+    name: String(form.get("name") ?? ""),
+    description: String(form.get("description") ?? ""),
+    price: String(form.get("price") ?? ""),
+    available: form.get("available") === "on",
+  }
+
+  const clearPhoto = form.get("clearPhoto") === "on"
+  const photo = form.get("photo")
+  let photoStorageId: Awaited<ReturnType<typeof uploadImage>> | undefined
+  let skipSave = false
+
+  if (isFilledFile(photo)) {
+    const imageError = imageFieldError(photo)
+    if (imageError) {
+      formError = imageError
+      fieldErrors = { photo: imageError }
+      skipSave = true
+    } else {
+      photoStorageId = await uploadImage(photo, token)
+    }
+  }
+
+  if (!skipSave) {
+    const result = await updateProduct(slug, productId, formValues, token, {
+      photoStorageId,
+      clearPhoto,
+    })
+    if (result.ok) {
+      saved = true
+      formValues = {
+        name: result.product.name,
+        description: result.product.description,
+        price: String(result.product.price),
+        available: result.product.available,
+      }
+      photoUrl = result.product.photoUrl
+    } else {
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    }
+  }
+}
+---
+
+<Layout title={`Editar | ${product.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="products" />
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="flex flex-col gap-5"
+    >
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : saved ? (
+          <p class="text-sm text-muted-foreground" role="status">
+            Guardado.
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={formValues.name}
+            aria-invalid={fieldErrors.name ? true : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError>{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.description ? true : undefined}>
+          <FieldLabel htmlFor="description">Descripción</FieldLabel>
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={formValues.description}
+            aria-invalid={fieldErrors.description ? true : undefined}
+          />
+        </Field>
+        <Field data-invalid={fieldErrors.price ? true : undefined}>
+          <FieldLabel htmlFor="price">Precio (C$)</FieldLabel>
+          <Input
+            id="price"
+            name="price"
+            inputMode="decimal"
+            defaultValue={formValues.price}
+            aria-invalid={fieldErrors.price ? true : undefined}
+          />
+          {
+            fieldErrors.price ? (
+              <FieldError>{fieldErrors.price}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="photo">Foto</FieldLabel>
+          {
+            photoUrl ? (
+              <img src={photoUrl} alt="" class="mb-2 h-24 w-24 object-cover" />
+            ) : null
+          }
+          <Input
+            id="photo"
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          />
+          <FieldDescription>JPG, PNG o WebP. Máximo 2 MB.</FieldDescription>
+        </Field>
+        {
+          photoUrl ? (
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="clearPhoto" />
+              Quitar foto
+            </label>
+          ) : null
+        }
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="available"
+            checked={formValues.available ? true : undefined}
+          />
+          Visible en la tienda
+        </label>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit" name="intent" value="save">
+        Guardar
+      </button>
+    </form>
+    <form method="post">
+      <button
+        class={buttonVariants({ variant: "ghost" })}
+        type="submit"
+        name="intent"
+        value="delete"
+      >
+        Eliminar producto
+      </button>
+    </form>
+  </main>
+</Layout>

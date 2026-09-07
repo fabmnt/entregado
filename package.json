@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=@entregado/backend --filter=web --filter=business",
     "dev:backend": "turbo dev --filter=@entregado/backend",
-    "dev:web": "pnpm --filter @entregado/backend run dev:web",
-    "dev:business": "turbo dev --filter=business --filter=@entregado/backend",
+    "dev:web": "pnpm --filter web dev",
+    "dev:business": "pnpm --filter business dev",
     "lint": "turbo lint",
     "format": "turbo format",
     "format:check": "turbo format:check",

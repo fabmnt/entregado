@@ -13,7 +13,7 @@ function isAuthPage(pathname: string): boolean {
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url
 
-  if (!isAdminPath(pathname) && !isAuthPage(pathname)) {
+  if (!isAdminPath(pathname) && !isAuthPage(pathname) && pathname !== "/") {
     context.locals.user = null
     context.locals.convexToken = null
     return next()
@@ -33,7 +33,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.user = user
   context.locals.convexToken = token
 
-  if (isAdminPath(pathname) && !user) {
+  if ((isAdminPath(pathname) || pathname === "/") && !user) {
     return context.redirect("/login")
   }
 

@@ -8,10 +8,14 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as auth from "../auth.js";
 import type * as businesses from "../businesses.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as identity from "../identity.js";
+import type * as phone from "../phone.js";
+import type * as products from "../products.js";
 
 import type {
   ApiFromModules,
@@ -20,10 +24,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   auth: typeof auth;
   businesses: typeof businesses;
+  files: typeof files;
   http: typeof http;
   identity: typeof identity;
+  phone: typeof phone;
+  products: typeof products;
 }>;
 
 /**

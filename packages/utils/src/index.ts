@@ -1,2 +1,8 @@
 export { formatCordoba } from "./money"
-export { isNicaraguaMobileOrLandline, toE164Nicaragua } from "./phone"
+export {
+  isNicaraguaMobileOrLandline,
+  nicaraguaLocalDigits,
+  parseNicaraguaPhone,
+  toE164Nicaragua,
+  whatsappMeUrl,
+} from "./phone"

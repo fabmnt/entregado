@@ -13,12 +13,13 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
-import Layout from "../layouts/main.astro"
+import Layout from "../../layouts/main.astro"
 import {
   createBusiness,
   listManagedBusinesses,
-  type FieldErrors,
-} from "../lib/businesses"
+  type CreateFieldErrors,
+} from "../../lib/businesses"
+import { imageFieldError, isFilledFile, uploadImage } from "../../lib/images"
 
 const KIND_OPTIONS = [
   { value: "food", label: "Comida" },
@@ -33,6 +34,7 @@ type FormValues = {
   advantages: string
   scope: string
   productPitch: string
+  whatsapp: string
 }
 
 const emptyForm: FormValues = {
@@ -43,10 +45,11 @@ const emptyForm: FormValues = {
   advantages: "",
   scope: "",
   productPitch: "",
+  whatsapp: "",
 }
 
 let formValues = emptyForm
-let fieldErrors: FieldErrors = {}
+let fieldErrors: CreateFieldErrors = {}
 let formError = ""
 
 const token = Astro.locals.convexToken
@@ -66,22 +69,38 @@ if (Astro.request.method === "POST") {
     advantages: String(form.get("advantages") ?? ""),
     scope: String(form.get("scope") ?? ""),
     productPitch: String(form.get("productPitch") ?? ""),
+    whatsapp: String(form.get("whatsapp") ?? ""),
   }
 
-  const result = await createBusiness(formValues, token)
-  if (result.ok) {
-    return Astro.redirect("/admin", 303)
+  const logo = form.get("logo")
+  let logoStorageId: Awaited<ReturnType<typeof uploadImage>> | undefined
+  let skipCreate = false
+  if (isFilledFile(logo)) {
+    const imageError = imageFieldError(logo)
+    if (imageError) {
+      formError = imageError
+      skipCreate = true
+    } else {
+      logoStorageId = await uploadImage(logo, token)
+    }
   }
 
-  formError = result.error
-  fieldErrors = result.fieldErrors
+  if (!skipCreate) {
+    const result = await createBusiness(formValues, token, logoStorageId)
+    if (result.ok) {
+      return Astro.redirect(`/admin/${result.business.slug}`, 303)
+    }
+
+    formError = result.error
+    fieldErrors = result.fieldErrors
+  }
 }
 
 const listed = await listManagedBusinesses(token)
 const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
 ---
 
-<Layout>
+<Layout title="Negocios | Entregado">
   <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
     <header class="flex flex-col gap-3">
       <div class="flex items-start justify-between gap-4">
@@ -113,7 +132,12 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
         <ul class="flex flex-col gap-3">
           {listed.map((business) => (
             <li class="flex flex-col gap-0.5 border-b border-border pb-3">
-              <span class="text-sm font-medium">{business.name}</span>
+              <a
+                href={`/admin/${business.slug}`}
+                class="text-sm font-medium underline-offset-4 hover:underline"
+              >
+                {business.name}
+              </a>
               <span class="text-sm text-muted-foreground">
                 {business.kind === "pharmacy" ? "Farmacia" : "Comida"} ·{" "}
                 {business.slug}
@@ -124,7 +148,11 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
       )
     }
 
-    <form method="post" class="flex flex-col gap-5">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="flex flex-col gap-5"
+    >
       <h2 class="text-sm font-medium">Nuevo negocio</h2>
       {
         formError ? (
@@ -157,7 +185,8 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             aria-invalid={fieldErrors.slug ? true : undefined}
           />
           <FieldDescription>
-            Va a ser el subdominio. Solo minúsculas, números y guiones.
+            Dirección de la tienda: /tu-slug. Solo minúsculas, números y
+            guiones. No se puede cambiar después.
           </FieldDescription>
           {
             fieldErrors.slug ? (
@@ -187,6 +216,32 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
               <FieldError>{fieldErrors.kind}</FieldError>
             ) : null
           }
+        </Field>
+        <Field data-invalid={fieldErrors.whatsapp ? true : undefined}>
+          <FieldLabel htmlFor="whatsapp">WhatsApp</FieldLabel>
+          <Input
+            id="whatsapp"
+            name="whatsapp"
+            inputMode="numeric"
+            defaultValue={formValues.whatsapp}
+            aria-invalid={fieldErrors.whatsapp ? true : undefined}
+          />
+          <FieldDescription>8 dígitos de Nicaragua.</FieldDescription>
+          {
+            fieldErrors.whatsapp ? (
+              <FieldError>{fieldErrors.whatsapp}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="logo">Logo (opcional)</FieldLabel>
+          <Input
+            id="logo"
+            name="logo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          />
+          <FieldDescription>JPG, PNG o WebP. Máximo 2 MB.</FieldDescription>
         </Field>
         <Field data-invalid={fieldErrors.description ? true : undefined}>
           <FieldLabel htmlFor="description">Descripción</FieldLabel>

@@ -1,0 +1,126 @@
+---
+import {
+  formatCordoba,
+  nicaraguaLocalDigits,
+  whatsappMeUrl,
+} from "@entregado/utils"
+import Layout from "../layouts/main.astro"
+import { getStorefront } from "../lib/businesses"
+
+const slug = Astro.params.slug
+
+if (!slug) {
+  return new Response(null, { status: 404 })
+}
+
+const store = await getStorefront(slug)
+if (!store) {
+  return new Response(null, { status: 404 })
+}
+
+const { business, products } = store
+const whatsapp = business.whatsapp
+---
+
+<Layout title={business.name} description={business.description}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-10 p-6">
+    <header class="flex flex-col gap-4">
+      {
+        business.logoUrl ? (
+          <img src={business.logoUrl} alt="" class="h-16 w-16 object-cover" />
+        ) : null
+      }
+      <div class="flex flex-col gap-1">
+        <h1 class="text-2xl font-medium">{business.name}</h1>
+        <p class="text-sm text-muted-foreground">
+          {business.kind === "pharmacy" ? "Farmacia" : "Comida"}
+        </p>
+      </div>
+      <p class="text-sm leading-relaxed">{business.description}</p>
+      {
+        business.productPitch ? (
+          <p class="text-sm leading-relaxed text-muted-foreground">
+            {business.productPitch}
+          </p>
+        ) : null
+      }
+      {
+        business.advantages ? (
+          <p class="text-sm leading-relaxed text-muted-foreground">
+            {business.advantages}
+          </p>
+        ) : null
+      }
+      {
+        business.scope ? (
+          <p class="text-sm leading-relaxed text-muted-foreground">
+            {business.scope}
+          </p>
+        ) : null
+      }
+    </header>
+
+    <section class="flex flex-col gap-3" aria-labelledby="contact-heading">
+      <h2 id="contact-heading" class="text-sm font-medium">Contacto</h2>
+      {
+        whatsapp ? (
+          <a
+            class="text-sm font-medium underline-offset-4 hover:underline"
+            href={whatsappMeUrl(whatsapp)}
+          >
+            Escribir por WhatsApp
+          </a>
+        ) : null
+      }
+      {
+        business.phone ? (
+          <p class="text-sm text-muted-foreground">
+            Tel: {nicaraguaLocalDigits(business.phone)}
+          </p>
+        ) : null
+      }
+      {
+        business.address ? (
+          <p class="text-sm text-muted-foreground">{business.address}</p>
+        ) : null
+      }
+      {
+        business.hours ? (
+          <p class="text-sm text-muted-foreground">{business.hours}</p>
+        ) : null
+      }
+    </section>
+
+    <section class="flex flex-col gap-4" aria-labelledby="products-heading">
+      <h2 id="products-heading" class="text-sm font-medium">Productos</h2>
+      {
+        products.length === 0 ? (
+          <p class="text-sm text-muted-foreground">
+            Aún no hay productos publicados.
+          </p>
+        ) : (
+          <ul class="flex flex-col gap-6">
+            {products.map((product) => (
+              <li class="flex gap-4 border-b border-border pb-6">
+                {product.photoUrl ? (
+                  <img
+                    src={product.photoUrl}
+                    alt=""
+                    class="h-20 w-20 shrink-0 object-cover"
+                  />
+                ) : null}
+                <div class="flex min-w-0 flex-col gap-1">
+                  <p class="text-sm font-medium">{product.name}</p>
+                  <p class="text-sm text-muted-foreground">
+                    {product.description}
+                  </p>
+                  <p class="text-sm">{formatCordoba(product.price)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </section>
+  </main>
+</Layout>
