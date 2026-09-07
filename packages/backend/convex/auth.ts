@@ -24,6 +24,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
 
         await ctx.db.insert("users", {
           authUserId: doc._id,
+          // Development bootstrap: the first account is the general admin.
           kind: admins.length === 0 ? "admin" : "business_owner",
         })
       },
