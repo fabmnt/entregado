@@ -1,7 +1,12 @@
 import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
+// Shared platform database. Many businesses share these tables; isolate
+// tenant data with owner, slug, or business id. Do not add a Convex app
+// per business.
+
 export const businessKind = v.union(v.literal("food"), v.literal("pharmacy"))
+export const userKind = v.union(v.literal("admin"), v.literal("business_owner"))
 
 export const businessFields = v.object({
   slug: v.string(),
@@ -11,6 +16,7 @@ export const businessFields = v.object({
   advantages: v.string(),
   scope: v.string(),
   productPitch: v.string(),
+  ownerTokenIdentifier: v.optional(v.string()),
 })
 
 export const directoryBusiness = v.object({
@@ -26,5 +32,13 @@ export const directoryBusiness = v.object({
 })
 
 export default defineSchema({
-  businesses: defineTable(businessFields).index("by_slug", ["slug"]),
+  users: defineTable({
+    authUserId: v.string(),
+    kind: userKind,
+  })
+    .index("by_auth_user", ["authUserId"])
+    .index("by_kind", ["kind"]),
+  businesses: defineTable(businessFields)
+    .index("by_slug", ["slug"])
+    .index("by_owner", ["ownerTokenIdentifier"]),
 })

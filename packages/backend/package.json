@@ -1,5 +1,5 @@
 {
-  "name": "@entregado/utils",
+  "name": "@entregado/backend",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -7,21 +7,25 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "dev": "convex dev",
+    "dev:web": "convex dev --start 'pnpm --filter web dev'",
+    "codegen": "convex codegen",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex"
   },
   "dependencies": {
-    "@entregado/types": "workspace:*"
+    "@convex-dev/better-auth": "^0.12.5",
+    "better-auth": "~1.6.30",
+    "convex": "^1.45.0"
   },
   "devDependencies": {
     "@eslint/js": "^10",
+    "@types/node": "^24",
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",
-    "typescript-eslint": "^8",
-    "vitest": "^4"
+    "typescript-eslint": "^8"
   }
 }

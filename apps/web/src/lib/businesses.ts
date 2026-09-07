@@ -73,6 +73,7 @@ export type FieldErrors = Partial<
 export type CreateBusinessResult =
   | { ok: true; business: DirectoryBusiness }
   | { ok: false; status: 400; error: string; fieldErrors: FieldErrors }
+  | { ok: false; status: 401; error: string; fieldErrors: FieldErrors }
   | { ok: false; status: 409; error: string; fieldErrors: FieldErrors }
 
 function fieldErrorsFromZod(error: z.ZodError): FieldErrors {
@@ -89,8 +90,8 @@ function fieldErrorsFromZod(error: z.ZodError): FieldErrors {
   return fieldErrors
 }
 
-function isSlugTakenError(error: unknown): boolean {
-  return error instanceof ConvexError && error.data === "SLUG_TAKEN"
+function isConvexErrorCode(error: unknown, code: string): boolean {
+  return error instanceof ConvexError && error.data === code
 }
 
 export async function listBusinesses(): Promise<DirectoryBusiness[]> {
@@ -103,8 +104,15 @@ export async function getBusinessBySlug(
   return await getConvexClient().query(api.businesses.getBySlug, { slug })
 }
 
+export async function listManagedBusinesses(
+  token: string
+): Promise<DirectoryBusiness[]> {
+  return await getConvexClient(token).query(api.businesses.listForSignedIn, {})
+}
+
 export async function createBusiness(
-  input: unknown
+  input: unknown,
+  token: string | null
 ): Promise<CreateBusinessResult> {
   const parsed = createBusinessSchema.safeParse(input)
 
@@ -117,14 +125,31 @@ export async function createBusiness(
     }
   }
 
+  if (!token) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Inicia sesión para registrar un negocio",
+      fieldErrors: {},
+    }
+  }
+
   try {
-    const business = await getConvexClient().mutation(
+    const business = await getConvexClient(token).mutation(
       api.businesses.create,
       parsed.data
     )
     return { ok: true, business }
   } catch (error) {
-    if (isSlugTakenError(error)) {
+    if (isConvexErrorCode(error, "UNAUTHENTICATED")) {
+      return {
+        ok: false,
+        status: 401,
+        error: "Inicia sesión para registrar un negocio",
+        fieldErrors: {},
+      }
+    }
+    if (isConvexErrorCode(error, "SLUG_TAKEN")) {
       return {
         ok: false,
         status: 409,

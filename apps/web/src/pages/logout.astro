@@ -1,0 +1,11 @@
+---
+import { postConvexAuth, redirectWithCookies } from "../lib/auth-server"
+
+if (Astro.request.method !== "POST") {
+  return Astro.redirect("/login", 303)
+}
+
+const response = await postConvexAuth(Astro.request, "/api/auth/sign-out", {})
+const nextResponse = redirectWithCookies("/login", response)
+return nextResponse
+---

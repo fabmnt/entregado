@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
+import { requireSignedInUser } from "./identity"
 import { businessFields, directoryBusiness } from "./schema"
 
 const DIRECTORY_LIST_LIMIT = 100
@@ -43,10 +44,37 @@ export const getBySlug = query({
   },
 })
 
+export const listForSignedIn = query({
+  args: {},
+  returns: v.array(directoryBusiness),
+  handler: async (ctx) => {
+    const user = await requireSignedInUser(ctx)
+
+    if (user.kind === "admin") {
+      const rows = await ctx.db
+        .query("businesses")
+        .order("desc")
+        .take(DIRECTORY_LIST_LIMIT)
+      return rows.map(toDirectoryBusiness)
+    }
+
+    const rows = await ctx.db
+      .query("businesses")
+      .withIndex("by_owner", (q) =>
+        q.eq("ownerTokenIdentifier", user.tokenIdentifier)
+      )
+      .order("desc")
+      .take(DIRECTORY_LIST_LIMIT)
+    return rows.map(toDirectoryBusiness)
+  },
+})
+
 export const create = mutation({
-  args: businessFields.fields,
+  args: businessFields.omit("ownerTokenIdentifier").fields,
   returns: directoryBusiness,
   handler: async (ctx, args) => {
+    const user = await requireSignedInUser(ctx)
+
     const existing = await ctx.db
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
@@ -56,7 +84,10 @@ export const create = mutation({
       throw new ConvexError("SLUG_TAKEN")
     }
 
-    const id = await ctx.db.insert("businesses", args)
+    const id = await ctx.db.insert("businesses", {
+      ...args,
+      ownerTokenIdentifier: user.tokenIdentifier,
+    })
     const row = await ctx.db.get("businesses", id)
     if (!row) {
       throw new Error("Insert did not persist the business")

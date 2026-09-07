@@ -1,6 +1,16 @@
 export const BUSINESS_KINDS = ["food", "pharmacy"] as const
 export type BusinessKind = (typeof BUSINESS_KINDS)[number]
 
+export const USER_KINDS = ["admin", "business_owner"] as const
+export type UserKind = (typeof USER_KINDS)[number]
+
+export type SignedInUser = {
+  tokenIdentifier: string
+  email: string
+  name: string
+  kind: UserKind
+}
+
 export type DirectoryBusiness = {
   id: string
   slug: string

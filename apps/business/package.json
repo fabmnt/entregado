@@ -10,10 +10,12 @@
     "astro": "astro",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx,astro}\"",
-    "typecheck": "astro check"
+    "format:check": "prettier --check \"**/*.{ts,tsx,astro}\"",
+    "typecheck": "tsc --noEmit && astro check"
   },
   "dependencies": {
     "@astrojs/react": "^5",
+    "@entregado/backend": "workspace:*",
     "@entregado/types": "workspace:*",
     "@entregado/utils": "workspace:*",
     "@types/react": "^19",

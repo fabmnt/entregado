@@ -1,0 +1,129 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import Layout from "../layouts/main.astro"
+import {
+  authErrorMessage,
+  fieldErrorsFromZod,
+  signUpSchema,
+  type AuthFieldErrors,
+} from "../lib/auth-forms"
+import { postConvexAuth, redirectWithCookies } from "../lib/auth-server"
+
+let name = ""
+let email = ""
+let fieldErrors: AuthFieldErrors = {}
+let formError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  name = String(form.get("name") ?? "")
+  email = String(form.get("email") ?? "")
+  const parsed = signUpSchema.safeParse({
+    name,
+    email,
+    password: String(form.get("password") ?? ""),
+  })
+
+  if (!parsed.success) {
+    formError = "Revisa los datos de la cuenta"
+    fieldErrors = fieldErrorsFromZod(parsed.error)
+  } else {
+    const response = await postConvexAuth(
+      Astro.request,
+      "/api/auth/sign-up/email",
+      parsed.data
+    )
+    if (response.ok) {
+      const nextResponse = redirectWithCookies("/admin", response)
+      return nextResponse
+    }
+    formError = await authErrorMessage(response)
+  }
+}
+---
+
+<Layout title="Registro | Entregado">
+  <main class="mx-auto flex min-h-svh w-full max-w-sm flex-col gap-8 p-6">
+    <header class="flex flex-col gap-1">
+      <h1 class="text-xl font-medium">Crear cuenta</h1>
+      <p class="text-sm text-muted-foreground">
+        La primera cuenta que se registre es admin general. Las siguientes son
+        de dueño de negocio.
+      </p>
+    </header>
+    <form method="post" class="flex flex-col gap-5">
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            autoComplete="name"
+            defaultValue={name}
+            aria-invalid={fieldErrors.name ? true : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError>{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.email ? true : undefined}>
+          <FieldLabel htmlFor="email">Correo</FieldLabel>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            defaultValue={email}
+            aria-invalid={fieldErrors.email ? true : undefined}
+          />
+          {
+            fieldErrors.email ? (
+              <FieldError>{fieldErrors.email}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.password ? true : undefined}>
+          <FieldLabel htmlFor="password">Contraseña</FieldLabel>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={fieldErrors.password ? true : undefined}
+          />
+          <FieldDescription>Mínimo 8 caracteres.</FieldDescription>
+          {
+            fieldErrors.password ? (
+              <FieldError>{fieldErrors.password}</FieldError>
+            ) : null
+          }
+        </Field>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit">Crear cuenta</button>
+    </form>
+    <p class="text-sm text-muted-foreground">
+      ¿Ya tienes cuenta?
+      <a
+        class="text-foreground underline-offset-4 hover:underline"
+        href="/login">Entrar</a
+      >
+    </p>
+  </main>
+</Layout>

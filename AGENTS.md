@@ -1,6 +1,6 @@
 # Entregado
 
-Entregado es un sistema web para que los negocios gestionen sus pedidos, productos y entregas. No es un sistema de pedidos general,  acá cada negocio gestiona totalmente sus operaciones y recibe su web app desplegada.
+Entregado es un sistema web multi-negocio para que cada negocio gestione sus pedidos, productos y entregas. No es un sistema de pedidos general: todos los negocios usan una misma aplicación, base de datos y despliegue, pero cada uno gestiona sus operaciones de forma aislada.
 
 La interfaz de usuario de Entregado se debe mantener simple y fácil de usar, las interfaces se destacan por formularios sencillos, pocas opciones de configuración por página/pantalla y flujos de trabajos resaltados a simple vista y accesibles.
 
@@ -18,5 +18,5 @@ Este proyecto está en fase desarrollo sin usuarios de producción, así que se 
 
 ## Convex
 
-La persistencia de la web general está en `apps/web/convex`. Antes de tocar funciones Convex, lee `apps/web/convex/_generated/ai/guidelines.md`.
+La persistencia compartida de la plataforma está en `packages/backend`. Un solo deployment Convex sirve a `apps/web` y `apps/business`. Antes de tocar funciones Convex, lee `packages/backend/convex/_generated/ai/guidelines.md`.
 
