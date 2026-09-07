@@ -1,15 +1,139 @@
 ---
 import Layout from "../layouts/main.astro"
+import SiteHeader from "../components/site-header.astro"
+import SiteFooter from "../components/site-footer.astro"
+import BusinessCard from "../components/business-card.astro"
+import { listBusinesses } from "../lib/businesses"
+import { HERO_IMAGE } from "../lib/directory"
+
+const businesses = await listBusinesses()
+
+const advantages = [
+  {
+    title: "Una tienda por negocio",
+    body: "Cada local recibe su propia app de ventas y pedidos. El catálogo vive ahí, no en un listado compartido.",
+  },
+  {
+    title: "El pedido llega al negocio",
+    body: "El cliente pide en la web del local. Ellos aceptan, preparan y despachan.",
+  },
+  {
+    title: "Ellos ponen las reglas",
+    body: "Horario, zona y qué venden lo decide cada negocio. Entregado no opera un marketplace.",
+  },
+] as const
 ---
 
-<Layout>
-  <main
-    class="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-3 p-6"
-  >
-    <h1 class="text-xl font-medium">Entregado</h1>
-    <p class="text-sm leading-relaxed text-muted-foreground">
-      Web general. Acá van a aparecer los negocios de comida y farmacia en
-      Nicaragua.
-    </p>
-  </main>
+<Layout
+  title="Entregado | Una tienda propia para cada negocio"
+  description="Entregado da a cada negocio su propia app de ventas y pedidos. Acá ves quiénes ya tienen la suya."
+>
+  <div class="flex min-h-svh flex-col">
+    <SiteHeader />
+
+    <main class="flex-1">
+      <section
+        class="grid lg:min-h-[calc(100svh-5.5rem)] lg:grid-cols-2"
+        aria-labelledby="hero-heading"
+      >
+        <div
+          class="flex flex-col justify-center gap-8 px-6 py-12 md:px-12 lg:px-16 lg:py-16"
+        >
+          <div class="flex max-w-xl flex-col gap-6">
+            <h1
+              id="hero-heading"
+              class="font-serif text-5xl leading-[0.95] font-medium md:text-6xl"
+            >
+              Cada negocio,
+              <br />
+              su propia tienda.
+            </h1>
+            <p
+              class="max-w-md text-sm leading-relaxed text-muted-foreground md:text-base"
+            >
+              Entregado le da a cada negocio una app de ventas y pedidos. El
+              catálogo, los pedidos y las entregas se atienden en su web, no en
+              un marketplace.
+            </p>
+          </div>
+
+          <a
+            href="#businesses"
+            class="inline-flex w-fit items-center justify-center rounded-full bg-primary px-7 py-3 text-sm text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            Ver negocios
+          </a>
+        </div>
+
+        <div class="relative min-h-[50vh] bg-muted lg:min-h-full">
+          <img
+            src={HERO_IMAGE}
+            alt="Mesa servida en un negocio"
+            width="1600"
+            height="2000"
+            class="h-full w-full object-cover"
+          />
+          <aside
+            class="absolute right-5 bottom-5 max-w-60 bg-background/85 p-5 backdrop-blur-sm md:right-8 md:bottom-8"
+          >
+            <p class="font-serif text-xl leading-snug">
+              Una app propia para vender y tomar pedidos.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section
+        class="px-6 py-16 md:px-12 md:py-20 lg:px-16"
+        aria-label="Qué es"
+      >
+        <ul class="grid gap-12 md:grid-cols-3 md:gap-16">
+          {
+            advantages.map((item) => (
+              <li class="flex max-w-xs flex-col gap-3">
+                <p class="font-serif text-2xl font-medium">{item.title}</p>
+                <p class="text-sm leading-relaxed text-muted-foreground">
+                  {item.body}
+                </p>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <section
+        id="businesses"
+        class="scroll-mt-8 px-6 py-24 md:px-12 md:py-32 lg:px-16"
+        aria-labelledby="businesses-heading"
+      >
+        <div class="mb-16 flex max-w-xl flex-col gap-4 md:mb-24">
+          <h2
+            id="businesses-heading"
+            class="font-serif text-4xl leading-tight font-medium md:text-5xl"
+          >
+            Negocios
+          </h2>
+          <p class="text-sm leading-relaxed text-muted-foreground">
+            Los que ya tienen su tienda en Entregado.
+          </p>
+        </div>
+
+        {
+          businesses.length === 0 ? (
+            <p class="max-w-md text-sm leading-relaxed text-muted-foreground">
+              Todavía no hay negocios con su tienda publicada.
+            </p>
+          ) : (
+            <div class="grid gap-x-16 gap-y-24 md:grid-cols-2">
+              {businesses.map((business) => (
+                <BusinessCard business={business} />
+              ))}
+            </div>
+          )
+        }
+      </section>
+    </main>
+
+    <SiteFooter />
+  </div>
 </Layout>

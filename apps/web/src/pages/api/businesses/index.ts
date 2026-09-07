@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro"
+import { getConvexAccessToken } from "../../../lib/auth-server"
 import { createBusiness, listBusinesses } from "../../../lib/businesses"
 import { json } from "../../../lib/http"
 
@@ -13,10 +14,11 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     payload = await request.json()
   } catch {
-    return json({ error: "El cuerpo debe ser JSON" }, 400)
+    return json({ error: "Request body must be JSON" }, 400)
   }
 
-  const result = await createBusiness(payload)
+  const token = await getConvexAccessToken(request)
+  const result = await createBusiness(payload, token)
 
   if (!result.ok) {
     return json(

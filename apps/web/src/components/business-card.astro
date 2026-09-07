@@ -1,0 +1,35 @@
+---
+import type { DirectoryBusiness } from "@entregado/types"
+import { businessPlaceholderImage, businessPortrait } from "../lib/directory"
+
+interface Props {
+  business: DirectoryBusiness
+}
+
+const { business } = Astro.props
+const imageSrc = businessPlaceholderImage(business.kind, business.slug)
+const portrait = businessPortrait(business)
+---
+
+<article class="flex flex-col gap-8">
+  <div class="overflow-hidden bg-muted">
+    <img
+      src={imageSrc}
+      alt={business.name}
+      width="1400"
+      height="1750"
+      loading="lazy"
+      class="aspect-[4/5] w-full object-cover"
+    />
+  </div>
+  <div class="flex max-w-md flex-col gap-4">
+    <h3 class="font-serif text-3xl leading-tight font-medium md:text-4xl">
+      {business.name}
+    </h3>
+    {
+      portrait.map((paragraph) => (
+        <p class="text-sm leading-relaxed text-muted-foreground">{paragraph}</p>
+      ))
+    }
+  </div>
+</article>

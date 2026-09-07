@@ -11,6 +11,7 @@ export const businessFields = v.object({
   advantages: v.string(),
   scope: v.string(),
   productPitch: v.string(),
+  ownerTokenIdentifier: v.optional(v.string()),
 })
 
 export const directoryBusiness = v.object({
@@ -26,5 +27,7 @@ export const directoryBusiness = v.object({
 })
 
 export default defineSchema({
-  businesses: defineTable(businessFields).index("by_slug", ["slug"]),
+  businesses: defineTable(businessFields)
+    .index("by_slug", ["slug"])
+    .index("by_owner", ["ownerTokenIdentifier"]),
 })

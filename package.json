@@ -9,6 +9,7 @@
     "dev:business": "turbo dev --filter=business",
     "lint": "turbo lint",
     "format": "turbo format",
+    "format:check": "turbo format:check",
     "typecheck": "turbo typecheck",
     "test": "turbo test"
   },
