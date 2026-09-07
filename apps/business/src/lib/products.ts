@@ -33,6 +33,8 @@ export type ProductMutationResult =
   | { ok: false; status: 401; error: string; fieldErrors: ProductFieldErrors }
   | { ok: false; status: 403; error: string; fieldErrors: ProductFieldErrors }
 
+export type ProductDeleteResult = { ok: true } | { ok: false; error: string }
+
 function parsePrice(raw: string): number {
   return Number(raw.replace(",", "."))
 }
@@ -185,9 +187,23 @@ export async function deleteProduct(
   slug: string,
   productId: Id<"products">,
   token: string
-): Promise<void> {
-  await getConvexClient(token).mutation(api.products.remove, {
-    slug,
-    productId,
-  })
+): Promise<ProductDeleteResult> {
+  try {
+    await getConvexClient(token).mutation(api.products.remove, {
+      slug,
+      productId,
+    })
+    return { ok: true }
+  } catch (error) {
+    if (isConvexErrorCode(error, "UNAUTHENTICATED")) {
+      return { ok: false, error: "Inicia sesión para eliminar" }
+    }
+    if (
+      isConvexErrorCode(error, "FORBIDDEN") ||
+      isConvexErrorCode(error, "NOT_FOUND")
+    ) {
+      return { ok: false, error: "No puedes eliminar este producto" }
+    }
+    return { ok: false, error: "No se pudo eliminar este producto" }
+  }
 }

@@ -16,5 +16,8 @@ export function getBusinessAppUrl(): string {
   if (typeof url === "string" && url.length > 0) {
     return url.replace(/\/$/, "")
   }
-  return "http://localhost:4322"
+  if (import.meta.env.DEV) {
+    return "http://localhost:4322"
+  }
+  throw new Error("PUBLIC_BUSINESS_URL is required outside local development")
 }

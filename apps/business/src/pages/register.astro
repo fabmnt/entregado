@@ -74,11 +74,13 @@ if (Astro.request.method === "POST") {
             name="name"
             autoComplete="name"
             defaultValue={name}
+            required
             aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "name-error" : undefined}
           />
           {
             fieldErrors.name ? (
-              <FieldError>{fieldErrors.name}</FieldError>
+              <FieldError id="name-error">{fieldErrors.name}</FieldError>
             ) : null
           }
         </Field>
@@ -90,11 +92,13 @@ if (Astro.request.method === "POST") {
             type="email"
             autoComplete="email"
             defaultValue={email}
+            required
             aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
           />
           {
             fieldErrors.email ? (
-              <FieldError>{fieldErrors.email}</FieldError>
+              <FieldError id="email-error">{fieldErrors.email}</FieldError>
             ) : null
           }
         </Field>
@@ -105,12 +109,18 @@ if (Astro.request.method === "POST") {
             name="password"
             type="password"
             autoComplete="new-password"
+            required
             aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password
+              ? "password-error"
+              : undefined}
           />
           <FieldDescription>Mínimo 8 caracteres.</FieldDescription>
           {
             fieldErrors.password ? (
-              <FieldError>{fieldErrors.password}</FieldError>
+              <FieldError id="password-error">
+                {fieldErrors.password}
+              </FieldError>
             ) : null
           }
         </Field>

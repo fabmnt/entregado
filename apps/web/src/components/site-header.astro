@@ -1,9 +1,7 @@
 ---
-const businessAppUrl =
-  typeof import.meta.env.PUBLIC_BUSINESS_URL === "string" &&
-  import.meta.env.PUBLIC_BUSINESS_URL.length > 0
-    ? import.meta.env.PUBLIC_BUSINESS_URL.replace(/\/$/, "")
-    : "http://localhost:4322"
+import { getBusinessAppUrl } from "../lib/businesses"
+
+const businessAppUrl = getBusinessAppUrl()
 
 const links = [
   { href: "#businesses", label: "Negocios" },

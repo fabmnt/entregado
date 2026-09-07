@@ -3,6 +3,7 @@ import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import { requireManagedBusiness } from "./access"
+import { deleteStorageIfUnreferenced } from "./files"
 import { requireSignedInUser } from "./identity"
 import { parseNicaraguaE164 } from "./phone"
 import {
@@ -128,16 +129,14 @@ export const getStoreBySlug = query({
 
     const productRows = await ctx.db
       .query("products")
-      .withIndex("by_businessId", (q) => q.eq("businessId", business._id))
+      .withIndex("by_businessId_and_available", (q) =>
+        q.eq("businessId", business._id).eq("available", true)
+      )
       .order("desc")
       .take(DIRECTORY_LIST_LIMIT)
 
-    const products = []
-    for (const product of productRows) {
-      if (!product.available) {
-        continue
-      }
-      products.push({
+    const products = await Promise.all(
+      productRows.map(async (product) => ({
         id: product._id,
         name: product.name,
         description: product.description,
@@ -146,8 +145,8 @@ export const getStoreBySlug = query({
         photoUrl: product.photoStorageId
           ? await ctx.storage.getUrl(product.photoStorageId)
           : null,
-      })
-    }
+      }))
+    )
 
     return {
       business: await toManagedBusiness(ctx, business),
@@ -251,17 +250,13 @@ export const updateProfile = mutation({
     const parsedPhone = phone ? parseNicaraguaE164(phone) : undefined
 
     let nextLogo = business.logoStorageId
+    let previousLogoToDelete: typeof business.logoStorageId
     if (args.clearLogo) {
-      if (business.logoStorageId) {
-        await ctx.storage.delete(business.logoStorageId)
-      }
+      previousLogoToDelete = business.logoStorageId
       nextLogo = undefined
     } else if (args.logoStorageId) {
-      if (
-        business.logoStorageId &&
-        business.logoStorageId !== args.logoStorageId
-      ) {
-        await ctx.storage.delete(business.logoStorageId)
+      if (business.logoStorageId !== args.logoStorageId) {
+        previousLogoToDelete = business.logoStorageId
       }
       nextLogo = args.logoStorageId
     }
@@ -288,6 +283,9 @@ export const updateProfile = mutation({
     const row = await ctx.db.get("businesses", business._id)
     if (!row) {
       throw new Error("Update did not persist the business")
+    }
+    if (previousLogoToDelete) {
+      await deleteStorageIfUnreferenced(ctx, previousLogoToDelete)
     }
     return await toManagedBusiness(ctx, row)
   },

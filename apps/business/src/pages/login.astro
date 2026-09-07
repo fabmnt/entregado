@@ -71,11 +71,13 @@ if (Astro.request.method === "POST") {
             type="email"
             autoComplete="email"
             defaultValue={email}
+            required
             aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
           />
           {
             fieldErrors.email ? (
-              <FieldError>{fieldErrors.email}</FieldError>
+              <FieldError id="email-error">{fieldErrors.email}</FieldError>
             ) : null
           }
         </Field>
@@ -86,11 +88,17 @@ if (Astro.request.method === "POST") {
             name="password"
             type="password"
             autoComplete="current-password"
+            required
             aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password
+              ? "password-error"
+              : undefined}
           />
           {
             fieldErrors.password ? (
-              <FieldError>{fieldErrors.password}</FieldError>
+              <FieldError id="password-error">
+                {fieldErrors.password}
+              </FieldError>
             ) : null
           }
         </Field>

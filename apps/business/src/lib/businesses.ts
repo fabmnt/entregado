@@ -88,10 +88,14 @@ export const updateProfileSchema = z.object({
 
 export type CreateFieldErrors = Partial<
   Record<keyof CreateDirectoryBusinessInput, string>
->
+> & {
+  logo?: string
+}
 export type ProfileFieldErrors = Partial<
   Record<keyof z.infer<typeof updateProfileSchema>, string>
->
+> & {
+  logo?: string
+}
 
 export function fieldErrorsFromZod<T extends string>(
   error: z.ZodError

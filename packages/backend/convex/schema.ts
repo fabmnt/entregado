@@ -76,6 +76,10 @@ export default defineSchema({
     .index("by_kind", ["kind"]),
   businesses: defineTable(businessFields)
     .index("by_slug", ["slug"])
-    .index("by_owner", ["ownerTokenIdentifier"]),
-  products: defineTable(productFields).index("by_businessId", ["businessId"]),
+    .index("by_owner", ["ownerTokenIdentifier"])
+    .index("by_logoStorageId", ["logoStorageId"]),
+  products: defineTable(productFields)
+    .index("by_businessId", ["businessId"])
+    .index("by_businessId_and_available", ["businessId", "available"])
+    .index("by_photoStorageId", ["photoStorageId"]),
 })

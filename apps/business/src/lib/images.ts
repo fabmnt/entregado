@@ -2,6 +2,7 @@ import type { Id } from "@entregado/backend"
 import { api, getConvexClient } from "./convex"
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+const UPLOAD_TIMEOUT_MS = 30_000
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 export function isFilledFile(value: FormDataEntryValue | null): value is File {
@@ -26,25 +27,52 @@ export async function uploadImage(
     api.files.generateUploadUrl,
     {}
   )
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: { "Content-Type": file.type },
-    body: file,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS)
 
-  if (!response.ok) {
-    throw new Error("UPLOAD_FAILED")
+  try {
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error("UPLOAD_FAILED")
+    }
+
+    const payload: unknown = await response.json()
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !("storageId" in payload) ||
+      typeof payload.storageId !== "string"
+    ) {
+      throw new Error("UPLOAD_FAILED")
+    }
+
+    return payload.storageId as Id<"_storage">
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("UPLOAD_FAILED", { cause: error })
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
+}
 
-  const payload: unknown = await response.json()
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("storageId" in payload) ||
-    typeof payload.storageId !== "string"
-  ) {
-    throw new Error("UPLOAD_FAILED")
+export async function deleteUploadedImage(
+  storageId: Id<"_storage">,
+  token: string
+): Promise<boolean> {
+  try {
+    await getConvexClient(token).mutation(api.files.deleteIfUnreferenced, {
+      storageId,
+    })
+    return true
+  } catch {
+    return false
   }
-
-  return payload.storageId as Id<"_storage">
 }

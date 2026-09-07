@@ -3,6 +3,7 @@ import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import { requireManagedBusiness } from "./access"
+import { deleteStorageIfUnreferenced } from "./files"
 import { storeProduct } from "./schema"
 
 const PRODUCT_LIST_LIMIT = 100
@@ -108,17 +109,13 @@ export const update = mutation({
     assertPrice(args.price)
 
     let nextPhoto = product.photoStorageId
+    let previousPhotoToDelete: typeof product.photoStorageId
     if (args.clearPhoto) {
-      if (product.photoStorageId) {
-        await ctx.storage.delete(product.photoStorageId)
-      }
+      previousPhotoToDelete = product.photoStorageId
       nextPhoto = undefined
     } else if (args.photoStorageId) {
-      if (
-        product.photoStorageId &&
-        product.photoStorageId !== args.photoStorageId
-      ) {
-        await ctx.storage.delete(product.photoStorageId)
+      if (product.photoStorageId !== args.photoStorageId) {
+        previousPhotoToDelete = product.photoStorageId
       }
       nextPhoto = args.photoStorageId
     }
@@ -136,6 +133,9 @@ export const update = mutation({
     if (!row) {
       throw new Error("Update did not persist the product")
     }
+    if (previousPhotoToDelete) {
+      await deleteStorageIfUnreferenced(ctx, previousPhotoToDelete)
+    }
     return await toStoreProduct(ctx, row)
   },
 })
@@ -152,10 +152,10 @@ export const remove = mutation({
     if (!product || product.businessId !== business._id) {
       throw new ConvexError("NOT_FOUND")
     }
-    if (product.photoStorageId) {
-      await ctx.storage.delete(product.photoStorageId)
-    }
     await ctx.db.delete("products", product._id)
+    if (product.photoStorageId) {
+      await deleteStorageIfUnreferenced(ctx, product.photoStorageId)
+    }
     return null
   },
 })
