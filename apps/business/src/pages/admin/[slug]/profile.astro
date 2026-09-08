@@ -92,32 +92,37 @@ if (Astro.request.method === "POST") {
   }
 
   if (parsed.success && !skipSave) {
-    const result = await updateBusinessProfile(slug, parsed.data, token, {
-      logoStorageId,
-      clearLogo,
-    })
-    if (result.ok) {
-      saved = true
-      formValues = {
-        name: result.business.name,
-        description: result.business.description,
-        advantages: result.business.advantages,
-        scope: result.business.scope,
-        productPitch: result.business.productPitch,
-        whatsapp: result.business.whatsapp
-          ? nicaraguaLocalDigits(result.business.whatsapp)
-          : "",
-        phone: result.business.phone
-          ? nicaraguaLocalDigits(result.business.phone)
-          : "",
-        address: result.business.address ?? "",
-        hours: result.business.hours ?? "",
+    let mutationSucceeded = false
+    try {
+      const result = await updateBusinessProfile(slug, parsed.data, token, {
+        logoStorageId,
+        clearLogo,
+      })
+      if (result.ok) {
+        mutationSucceeded = true
+        saved = true
+        formValues = {
+          name: result.business.name,
+          description: result.business.description,
+          advantages: result.business.advantages,
+          scope: result.business.scope,
+          productPitch: result.business.productPitch,
+          whatsapp: result.business.whatsapp
+            ? nicaraguaLocalDigits(result.business.whatsapp)
+            : "",
+          phone: result.business.phone
+            ? nicaraguaLocalDigits(result.business.phone)
+            : "",
+          address: result.business.address ?? "",
+          hours: result.business.hours ?? "",
+        }
+        logoUrl = result.business.logoUrl
+      } else {
+        formError = result.error
+        fieldErrors = result.fieldErrors
       }
-      logoUrl = result.business.logoUrl
-    } else {
-      formError = result.error
-      fieldErrors = result.fieldErrors
-      if (logoStorageId) {
+    } finally {
+      if (!mutationSucceeded && logoStorageId) {
         const cleanedUp = await deleteUploadedImage(logoStorageId, token)
         if (!cleanedUp) {
           formError = `${formError}. No se pudo limpiar la imagen temporal.`

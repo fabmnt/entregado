@@ -82,16 +82,29 @@ if (Astro.request.method === "POST") {
   }
 
   if (parsed.success && !skipCreate) {
-    const result = await createProduct(slug, parsed.data, token, photoStorageId)
-    if (result.ok) {
-      return Astro.redirect(`/admin/${slug}/products`, 303)
-    }
-    formError = result.error
-    fieldErrors = result.fieldErrors
-    if (photoStorageId) {
-      const cleanedUp = await deleteUploadedImage(photoStorageId, token)
-      if (!cleanedUp) {
-        formError = `${formError}. No se pudo limpiar la imagen temporal.`
+    let mutationSucceeded = false
+    try {
+      const result = await createProduct(
+        slug,
+        parsed.data,
+        token,
+        photoStorageId
+      )
+      if (result.ok) {
+        mutationSucceeded = true
+        return Astro.redirect(`/admin/${slug}/products`, 303)
+      }
+
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    } catch {
+      formError = "No se pudo crear el producto"
+    } finally {
+      if (!mutationSucceeded && photoStorageId) {
+        const cleanedUp = await deleteUploadedImage(photoStorageId, token)
+        if (!cleanedUp) {
+          formError = `${formError}. No se pudo limpiar la imagen temporal.`
+        }
       }
     }
   }

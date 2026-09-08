@@ -10,12 +10,12 @@ import { getStorefront } from "../lib/businesses"
 const slug = Astro.params.slug
 
 if (!slug) {
-  return new Response(null, { status: 404 })
+  return Astro.rewrite("/404")
 }
 
 const store = await getStorefront(slug)
 if (!store) {
-  return new Response(null, { status: 404 })
+  return Astro.rewrite("/404")
 }
 
 const { business, products } = store

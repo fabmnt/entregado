@@ -101,17 +101,22 @@ if (Astro.request.method === "POST") {
   }
 
   if (parsed.success && !skipCreate) {
-    const result = await createBusiness(parsed.data, token, logoStorageId)
-    if (result.ok) {
-      return Astro.redirect(`/admin/${result.business.slug}`, 303)
-    }
+    let mutationSucceeded = false
+    try {
+      const result = await createBusiness(parsed.data, token, logoStorageId)
+      if (result.ok) {
+        mutationSucceeded = true
+        return Astro.redirect(`/admin/${result.business.slug}`, 303)
+      }
 
-    formError = result.error
-    fieldErrors = result.fieldErrors
-    if (logoStorageId) {
-      const cleanedUp = await deleteUploadedImage(logoStorageId, token)
-      if (!cleanedUp) {
-        formError = `${formError}. No se pudo limpiar la imagen temporal.`
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    } finally {
+      if (!mutationSucceeded && logoStorageId) {
+        const cleanedUp = await deleteUploadedImage(logoStorageId, token)
+        if (!cleanedUp) {
+          formError = `${formError}. No se pudo limpiar la imagen temporal.`
+        }
       }
     }
   }

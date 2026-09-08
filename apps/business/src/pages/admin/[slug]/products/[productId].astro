@@ -107,23 +107,36 @@ if (Astro.request.method === "POST") {
     }
 
     if (parsed.success && !skipSave) {
-      const result = await updateProduct(slug, productId, parsed.data, token, {
-        photoStorageId,
-        clearPhoto,
-      })
-      if (result.ok) {
-        saved = true
-        formValues = {
-          name: result.product.name,
-          description: result.product.description,
-          price: String(result.product.price),
-          available: result.product.available,
+      let mutationSucceeded = false
+      try {
+        const result = await updateProduct(
+          slug,
+          productId,
+          parsed.data,
+          token,
+          {
+            photoStorageId,
+            clearPhoto,
+          }
+        )
+        if (result.ok) {
+          mutationSucceeded = true
+          saved = true
+          formValues = {
+            name: result.product.name,
+            description: result.product.description,
+            price: String(result.product.price),
+            available: result.product.available,
+          }
+          photoUrl = result.product.photoUrl
+        } else {
+          formError = result.error
+          fieldErrors = result.fieldErrors
         }
-        photoUrl = result.product.photoUrl
-      } else {
-        formError = result.error
-        fieldErrors = result.fieldErrors
-        if (photoStorageId) {
+      } catch {
+        formError = "No se pudo guardar el producto"
+      } finally {
+        if (!mutationSucceeded && photoStorageId) {
           const cleanedUp = await deleteUploadedImage(photoStorageId, token)
           if (!cleanedUp) {
             formError = `${formError}. No se pudo limpiar la imagen temporal.`
