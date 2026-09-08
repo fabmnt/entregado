@@ -1,6 +1,6 @@
 ---
 import type { Id } from "@entregado/backend"
-import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
+import { formatCordoba } from "@entregado/utils"
 import Layout from "../../../layouts/main.astro"
 import { getStorefront } from "../../../lib/businesses"
 import {
@@ -64,16 +64,8 @@ if (!store || !sale) {
       </div>
       <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Teléfono</dt>
-        <dd>{nicaraguaLocalDigits(sale.buyerPhone)}</dd>
+        <dd>{sale.buyerPhone}</dd>
       </div>
-      {
-        sale.buyerLocation ? (
-          <div class="flex flex-col gap-0.5">
-            <dt class="text-muted-foreground">Ubicación</dt>
-            <dd>{sale.buyerLocation}</dd>
-          </div>
-        ) : null
-      }
     </dl>
   </main>
 </Layout>

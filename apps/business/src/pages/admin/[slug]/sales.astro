@@ -92,17 +92,19 @@ function saleSummary(sale: SaleView) {
                   </p>
                 ) : null}
                 <div class="flex flex-wrap gap-3">
-                  <form method="post">
-                    <input type="hidden" name="saleId" value={sale.id} />
-                    <button
-                      class={buttonVariants()}
-                      type="submit"
-                      name="intent"
-                      value="complete"
-                    >
-                      Completar
-                    </button>
-                  </form>
+                  {sale.fulfillment === "pickup" ? (
+                    <form method="post">
+                      <input type="hidden" name="saleId" value={sale.id} />
+                      <button
+                        class={buttonVariants()}
+                        type="submit"
+                        name="intent"
+                        value="complete"
+                      >
+                        Completar
+                      </button>
+                    </form>
+                  ) : null}
                   <form method="post">
                     <input type="hidden" name="saleId" value={sale.id} />
                     <button

@@ -16,6 +16,13 @@ function isDuplicateUserError(error: unknown): boolean {
     message?: unknown
     body?: unknown
   }
+  const bodyCode =
+    record.body && typeof record.body === "object"
+      ? (record.body as { code?: unknown }).code
+      : undefined
+  if (bodyCode === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") {
+    return true
+  }
   if (record.status === 422) {
     return true
   }

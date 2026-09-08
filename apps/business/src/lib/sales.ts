@@ -91,14 +91,26 @@ export function fulfillmentLabel(fulfillment: FulfillmentMode): string {
 }
 
 export async function getStoreProduct(slug: string, productId: Id<"products">) {
-  return await getConvexClient().query(api.products.getAvailableForStore, {
-    slug,
-    productId,
-  })
+  try {
+    return await getConvexClient().query(api.products.getAvailableForStore, {
+      slug,
+      productId,
+    })
+  } catch {
+    // Malformed ids fail Convex validation before reaching the query.
+    // Return null so storefront pages follow the existing /404 path.
+    return null
+  }
 }
 
 export async function getPublicSale(slug: string, saleId: Id<"sales">) {
-  return await getConvexClient().query(api.sales.getPublic, { slug, saleId })
+  try {
+    return await getConvexClient().query(api.sales.getPublic, { slug, saleId })
+  } catch {
+    // Malformed ids fail Convex validation before reaching the query.
+    // Return null so receipt pages follow the existing /404 path.
+    return null
+  }
 }
 
 export async function createSale(
@@ -276,6 +288,9 @@ export async function completeSaleAsRider(
 function mapOwnerSaleError(error: unknown, action: string): SaleActionResult {
   if (isConvexErrorCode(error, "SALE_NOT_OPEN")) {
     return { ok: false, error: "Esa venta ya está cerrada" }
+  }
+  if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
+    return { ok: false, error: "Solo los retiros se completan aquí" }
   }
   if (isConvexErrorCode(error, "UNAUTHENTICATED")) {
     return { ok: false, error: "Inicia sesión para continuar" }

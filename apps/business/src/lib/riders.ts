@@ -7,10 +7,11 @@ import { isConvexErrorCode } from "./convex-error"
 export const createRiderSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(80),
   email: z
-    .email("El correo no es válido")
+    .string()
     .trim()
     .toLowerCase()
-    .min(1, "El correo es obligatorio"),
+    .min(1, "El correo es obligatorio")
+    .pipe(z.email("El correo no es válido")),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 })
 

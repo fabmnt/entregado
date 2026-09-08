@@ -50,6 +50,26 @@ function assertOpenSale(sale: Doc<"sales">) {
   }
 }
 
+// Public receipts are unauthenticated, so hide buyer PII. Only the last
+// 4 digits are shown for confirmation; the location stays owner-only.
+function maskBuyerPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "")
+  const last4 = digits.slice(-4)
+  if (last4.length === 0) {
+    return "****"
+  }
+  return `**** ${last4}`
+}
+
+function toPublicSaleView(doc: Doc<"sales">) {
+  const view = toSaleView(doc)
+  return {
+    ...view,
+    buyerPhone: maskBuyerPhone(view.buyerPhone),
+    buyerLocation: null,
+  }
+}
+
 async function listByFulfillmentAndStatus(
   ctx: QueryCtx,
   businessId: Id<"businesses">,
@@ -84,7 +104,7 @@ export const getPublic = query({
     if (!sale || sale.businessId !== business._id) {
       return null
     }
-    return toSaleView(sale)
+    return toPublicSaleView(sale)
   },
 })
 
@@ -108,12 +128,16 @@ export const listManaged = query({
       .sort((a, b) => b._creationTime - a._creationTime)
 
     const recentRows = (
-      await ctx.db
-        .query("sales")
-        .withIndex("by_businessId", (q) => q.eq("businessId", business._id))
-        .order("desc")
-        .take(SALE_LIST_LIMIT)
-    ).filter((row) => row.status === "completed" || row.status === "cancelled")
+      await Promise.all([
+        listByFulfillmentAndStatus(ctx, business._id, "delivery", "completed"),
+        listByFulfillmentAndStatus(ctx, business._id, "pickup", "completed"),
+        listByFulfillmentAndStatus(ctx, business._id, "delivery", "cancelled"),
+        listByFulfillmentAndStatus(ctx, business._id, "pickup", "cancelled"),
+      ])
+    )
+      .flat()
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, SALE_LIST_LIMIT)
 
     return {
       open: openRows.map(toSaleView),
@@ -288,6 +312,9 @@ export const completeAsOwner = mutation({
     const sale = await ctx.db.get("sales", args.saleId)
     if (!sale || sale.businessId !== business._id) {
       throw new ConvexError("NOT_FOUND")
+    }
+    if (sale.fulfillment !== "pickup") {
+      throw new ConvexError("SALE_NOT_AVAILABLE")
     }
     assertOpenSale(sale)
 
