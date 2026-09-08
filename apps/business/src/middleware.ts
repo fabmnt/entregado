@@ -6,14 +6,27 @@ function isAdminPath(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/")
 }
 
+function isRiderPath(pathname: string): boolean {
+  return pathname === "/rider" || pathname.startsWith("/rider/")
+}
+
 function isAuthPage(pathname: string): boolean {
   return pathname === "/login" || pathname === "/register"
+}
+
+function needsSession(pathname: string): boolean {
+  return (
+    isAdminPath(pathname) ||
+    isRiderPath(pathname) ||
+    isAuthPage(pathname) ||
+    pathname === "/"
+  )
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url
 
-  if (!isAdminPath(pathname) && !isAuthPage(pathname) && pathname !== "/") {
+  if (!needsSession(pathname)) {
     context.locals.user = null
     context.locals.convexToken = null
     return next()
@@ -37,8 +50,20 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect("/login")
   }
 
-  if (isAuthPage(pathname) && user) {
+  if (isRiderPath(pathname) && !user) {
+    return context.redirect("/login")
+  }
+
+  if (user?.kind === "rider" && (isAdminPath(pathname) || pathname === "/")) {
+    return context.redirect("/rider")
+  }
+
+  if (user && user.kind !== "rider" && isRiderPath(pathname)) {
     return context.redirect("/admin")
+  }
+
+  if (isAuthPage(pathname) && user) {
+    return context.redirect(user.kind === "rider" ? "/rider" : "/admin")
   }
 
   return next()

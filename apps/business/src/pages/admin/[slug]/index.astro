@@ -22,6 +22,17 @@ if (!business) {
     <ul class="flex flex-col gap-3">
       <li>
         <a
+          href={`/admin/${business.slug}/sales`}
+          class="text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Ventas
+        </a>
+        <p class="text-sm text-muted-foreground">
+          Pedidos en curso, retiro y delivery.
+        </p>
+      </li>
+      <li>
+        <a
           href={`/admin/${business.slug}/products`}
           class="text-sm font-medium underline-offset-4 hover:underline"
         >
@@ -29,6 +40,17 @@ if (!business) {
         </a>
         <p class="text-sm text-muted-foreground">
           Añade, edita u oculta lo que se ve en la tienda.
+        </p>
+      </li>
+      <li>
+        <a
+          href={`/admin/${business.slug}/riders`}
+          class="text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Repartidores
+        </a>
+        <p class="text-sm text-muted-foreground">
+          Crea cuentas para quien entrega pedidos.
         </p>
       </li>
       <li>

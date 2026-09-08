@@ -121,6 +121,12 @@ const whatsapp = business.whatsapp
                     {product.description}
                   </p>
                   <p class="text-sm">{formatCordoba(product.price)}</p>
+                  <a
+                    href={`/${business.slug}/buy/${product.id}`}
+                    class="mt-2 text-sm font-medium underline-offset-4 hover:underline"
+                  >
+                    Comprar
+                  </a>
                 </div>
               </li>
             ))}

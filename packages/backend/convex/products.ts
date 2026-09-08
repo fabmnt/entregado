@@ -14,7 +14,11 @@ function assertPrice(price: number) {
   }
 }
 
-async function toStoreProduct(
+export function productSupportsDelivery(doc: Doc<"products">): boolean {
+  return doc.supportsDelivery !== false
+}
+
+export async function toStoreProduct(
   ctx: QueryCtx | MutationCtx,
   doc: Doc<"products">
 ) {
@@ -24,6 +28,7 @@ async function toStoreProduct(
     description: doc.description,
     price: doc.price,
     available: doc.available,
+    supportsDelivery: productSupportsDelivery(doc),
     photoUrl: doc.photoStorageId
       ? await ctx.storage.getUrl(doc.photoStorageId)
       : null,
@@ -58,6 +63,26 @@ export const getManaged = query({
   },
 })
 
+export const getAvailableForStore = query({
+  args: { slug: v.string(), productId: v.id("products") },
+  returns: v.union(storeProduct, v.null()),
+  handler: async (ctx, args) => {
+    const business = await ctx.db
+      .query("businesses")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique()
+    if (!business) {
+      return null
+    }
+
+    const product = await ctx.db.get("products", args.productId)
+    if (!product || product.businessId !== business._id || !product.available) {
+      return null
+    }
+    return await toStoreProduct(ctx, product)
+  },
+})
+
 export const create = mutation({
   args: {
     slug: v.string(),
@@ -65,6 +90,7 @@ export const create = mutation({
     description: v.string(),
     price: v.number(),
     available: v.boolean(),
+    supportsDelivery: v.boolean(),
     photoStorageId: v.optional(v.id("_storage")),
   },
   returns: storeProduct,
@@ -78,6 +104,7 @@ export const create = mutation({
       description: args.description,
       price: args.price,
       available: args.available,
+      supportsDelivery: args.supportsDelivery,
       photoStorageId: args.photoStorageId,
     })
     const row = await ctx.db.get("products", id)
@@ -96,6 +123,7 @@ export const update = mutation({
     description: v.string(),
     price: v.number(),
     available: v.boolean(),
+    supportsDelivery: v.boolean(),
     photoStorageId: v.optional(v.id("_storage")),
     clearPhoto: v.boolean(),
   },
@@ -126,6 +154,7 @@ export const update = mutation({
       description: args.description,
       price: args.price,
       available: args.available,
+      supportsDelivery: args.supportsDelivery,
       ...(nextPhoto ? { photoStorageId: nextPhoto } : {}),
     })
 

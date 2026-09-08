@@ -1,0 +1,79 @@
+---
+import type { Id } from "@entregado/backend"
+import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
+import Layout from "../../../layouts/main.astro"
+import { getStorefront } from "../../../lib/businesses"
+import {
+  fulfillmentLabel,
+  getPublicSale,
+  saleStatusLabel,
+} from "../../../lib/sales"
+
+export const prerender = false
+
+const slug = Astro.params.slug
+const saleIdParam = Astro.params.saleId
+
+if (!slug || !saleIdParam) {
+  return Astro.rewrite("/404")
+}
+
+const store = await getStorefront(slug)
+const sale = await getPublicSale(slug, saleIdParam as Id<"sales">)
+
+if (!store || !sale) {
+  return Astro.rewrite("/404")
+}
+---
+
+<Layout title={`Pedido | ${store.business.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex flex-col gap-2">
+      <a
+        href={`/${slug}`}
+        class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        {store.business.name}
+      </a>
+      <h1 class="text-xl font-medium">Pedido recibido</h1>
+      <p class="text-sm text-muted-foreground">
+        El negocio ya tiene tu pedido. No hace falta crear una cuenta.
+      </p>
+    </header>
+
+    <dl class="flex flex-col gap-3 text-sm">
+      <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Producto</dt>
+        <dd>
+          {sale.quantity} × {sale.productName} · {
+            formatCordoba(sale.totalPrice)
+          }
+        </dd>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Entrega</dt>
+        <dd>{fulfillmentLabel(sale.fulfillment)}</dd>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Estado</dt>
+        <dd>{saleStatusLabel(sale.status)}</dd>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Nombre</dt>
+        <dd>{sale.buyerName}</dd>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Teléfono</dt>
+        <dd>{nicaraguaLocalDigits(sale.buyerPhone)}</dd>
+      </div>
+      {
+        sale.buyerLocation ? (
+          <div class="flex flex-col gap-0.5">
+            <dt class="text-muted-foreground">Ubicación</dt>
+            <dd>{sale.buyerLocation}</dd>
+          </div>
+        ) : null
+      }
+    </dl>
+  </main>
+</Layout>

@@ -59,6 +59,7 @@ let formValues = {
   description: product.description,
   price: String(product.price),
   available: product.available,
+  supportsDelivery: product.supportsDelivery,
 }
 let photoUrl = product.photoUrl
 let fieldErrors: ProductFieldErrors = {}
@@ -81,6 +82,7 @@ if (Astro.request.method === "POST") {
       description: String(form.get("description") ?? ""),
       price: String(form.get("price") ?? ""),
       available: form.get("available") === "on",
+      supportsDelivery: form.get("supportsDelivery") === "on",
     }
 
     const clearPhoto = form.get("clearPhoto") === "on"
@@ -127,6 +129,7 @@ if (Astro.request.method === "POST") {
             description: result.product.description,
             price: String(result.product.price),
             available: result.product.available,
+            supportsDelivery: result.product.supportsDelivery,
           }
           photoUrl = result.product.photoUrl
         } else {
@@ -262,6 +265,14 @@ if (Astro.request.method === "POST") {
             checked={formValues.available ? true : undefined}
           />
           Visible en la tienda
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="supportsDelivery"
+            checked={formValues.supportsDelivery ? true : undefined}
+          />
+          Se puede entregar a domicilio
         </label>
       </FieldGroup>
       <button class={buttonVariants()} type="submit" name="intent" value="save">

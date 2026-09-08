@@ -1,0 +1,262 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@workspace/ui/components/native-select"
+import { Textarea } from "@workspace/ui/components/textarea"
+import { formatCordoba } from "@entregado/utils"
+import Layout from "../../../layouts/main.astro"
+import { fieldErrorsFromZod, getStorefront } from "../../../lib/businesses"
+import {
+  checkoutSchema,
+  createSale,
+  getStoreProduct,
+  type CheckoutFieldErrors,
+} from "../../../lib/sales"
+
+export const prerender = false
+
+const slug = Astro.params.slug
+const productIdParam = Astro.params.productId
+
+if (!slug || !productIdParam) {
+  return Astro.rewrite("/404")
+}
+
+const productId = productIdParam as Id<"products">
+const store = await getStorefront(slug)
+const product = await getStoreProduct(slug, productId)
+
+if (!store || !product) {
+  return Astro.rewrite("/404")
+}
+
+let formValues = {
+  quantity: "1",
+  buyerName: "",
+  buyerPhone: "",
+  fulfillment: product.supportsDelivery ? "delivery" : "pickup",
+  buyerLocation: "",
+}
+let fieldErrors: CheckoutFieldErrors = {}
+let formError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  formValues = {
+    quantity: String(form.get("quantity") ?? "1"),
+    buyerName: String(form.get("buyerName") ?? ""),
+    buyerPhone: String(form.get("buyerPhone") ?? ""),
+    fulfillment: product.supportsDelivery
+      ? String(form.get("fulfillment") ?? "pickup")
+      : "pickup",
+    buyerLocation: String(form.get("buyerLocation") ?? ""),
+  }
+
+  const parsed = checkoutSchema.safeParse(formValues)
+  if (!parsed.success) {
+    formError = "Revisa los datos del pedido"
+    fieldErrors = fieldErrorsFromZod(parsed.error)
+  } else {
+    const result = await createSale(slug, productId, parsed.data)
+    if (result.ok) {
+      return Astro.redirect(`/${slug}/sale/${result.sale.id}`, 303)
+    }
+    formError = result.error
+    fieldErrors = result.fieldErrors
+    if (result.status === 404) {
+      return Astro.redirect(`/${slug}`, 303)
+    }
+  }
+}
+---
+
+<Layout title={`Comprar ${product.name} | ${store.business.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex flex-col gap-2">
+      <a
+        href={`/${slug}`}
+        class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        {store.business.name}
+      </a>
+      <h1 class="text-xl font-medium">Comprar {product.name}</h1>
+      <p class="text-sm text-muted-foreground">
+        {formatCordoba(product.price)} · {product.description}
+      </p>
+    </header>
+
+    <form method="post" class="flex flex-col gap-5" id="checkout-form">
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.quantity ? true : undefined}>
+          <FieldLabel htmlFor="quantity">Cantidad</FieldLabel>
+          <Input
+            id="quantity"
+            name="quantity"
+            type="number"
+            min="1"
+            max="99"
+            defaultValue={formValues.quantity}
+            required
+            aria-invalid={fieldErrors.quantity ? true : undefined}
+            aria-describedby={fieldErrors.quantity
+              ? "quantity-error"
+              : undefined}
+          />
+          {
+            fieldErrors.quantity ? (
+              <FieldError id="quantity-error">
+                {fieldErrors.quantity}
+              </FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.buyerName ? true : undefined}>
+          <FieldLabel htmlFor="buyerName">Tu nombre</FieldLabel>
+          <Input
+            id="buyerName"
+            name="buyerName"
+            autoComplete="name"
+            defaultValue={formValues.buyerName}
+            required
+            aria-invalid={fieldErrors.buyerName ? true : undefined}
+            aria-describedby={fieldErrors.buyerName
+              ? "buyer-name-error"
+              : undefined}
+          />
+          {
+            fieldErrors.buyerName ? (
+              <FieldError id="buyer-name-error">
+                {fieldErrors.buyerName}
+              </FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.buyerPhone ? true : undefined}>
+          <FieldLabel htmlFor="buyerPhone">Teléfono</FieldLabel>
+          <Input
+            id="buyerPhone"
+            name="buyerPhone"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            defaultValue={formValues.buyerPhone}
+            required
+            aria-invalid={fieldErrors.buyerPhone ? true : undefined}
+            aria-describedby={fieldErrors.buyerPhone
+              ? "buyer-phone-error"
+              : undefined}
+          />
+          <FieldDescription>8 dígitos de Nicaragua.</FieldDescription>
+          {
+            fieldErrors.buyerPhone ? (
+              <FieldError id="buyer-phone-error">
+                {fieldErrors.buyerPhone}
+              </FieldError>
+            ) : null
+          }
+        </Field>
+        {
+          product.supportsDelivery ? (
+            <Field data-invalid={fieldErrors.fulfillment ? true : undefined}>
+              <FieldLabel htmlFor="fulfillment">Entrega</FieldLabel>
+              <NativeSelect
+                id="fulfillment"
+                name="fulfillment"
+                className="w-full"
+                defaultValue={formValues.fulfillment}
+                required
+                aria-invalid={fieldErrors.fulfillment ? true : undefined}
+                aria-describedby={
+                  fieldErrors.fulfillment ? "fulfillment-error" : undefined
+                }
+              >
+                <NativeSelectOption value="delivery">
+                  Delivery
+                </NativeSelectOption>
+                <NativeSelectOption value="pickup">
+                  Retiro en el negocio
+                </NativeSelectOption>
+              </NativeSelect>
+              {fieldErrors.fulfillment ? (
+                <FieldError id="fulfillment-error">
+                  {fieldErrors.fulfillment}
+                </FieldError>
+              ) : null}
+            </Field>
+          ) : (
+            <p class="text-sm text-muted-foreground">
+              Este producto se retira en el negocio.
+            </p>
+          )
+        }
+        {
+          product.supportsDelivery ? (
+            <Field
+              id="location-field"
+              hidden={formValues.fulfillment !== "delivery" ? true : undefined}
+              data-invalid={fieldErrors.buyerLocation ? true : undefined}
+            >
+              <FieldLabel htmlFor="buyerLocation">Ubicación</FieldLabel>
+              <Textarea
+                id="buyerLocation"
+                name="buyerLocation"
+                defaultValue={formValues.buyerLocation}
+                required={formValues.fulfillment === "delivery"}
+                aria-invalid={fieldErrors.buyerLocation ? true : undefined}
+                aria-describedby={
+                  fieldErrors.buyerLocation ? "buyer-location-error" : undefined
+                }
+              />
+              <FieldDescription>
+                Dirección o referencia para el repartidor.
+              </FieldDescription>
+              {fieldErrors.buyerLocation ? (
+                <FieldError id="buyer-location-error">
+                  {fieldErrors.buyerLocation}
+                </FieldError>
+              ) : null}
+            </Field>
+          ) : null
+        }
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit">Hacer pedido</button>
+    </form>
+  </main>
+</Layout>
+
+<script>
+  const select = document.getElementById("fulfillment")
+  const field = document.getElementById("location-field")
+  const input = document.getElementById("buyerLocation")
+  if (
+    select instanceof HTMLSelectElement &&
+    field instanceof HTMLElement &&
+    input instanceof HTMLTextAreaElement
+  ) {
+    const syncLocation = () => {
+      const isDelivery = select.value === "delivery"
+      field.hidden = !isDelivery
+      input.required = isDelivery
+    }
+    select.addEventListener("change", syncLocation)
+    syncLocation()
+  }
+</script>

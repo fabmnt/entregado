@@ -1,7 +1,7 @@
 export const BUSINESS_KINDS = ["food", "pharmacy"] as const
 export type BusinessKind = (typeof BUSINESS_KINDS)[number]
 
-export const USER_KINDS = ["admin", "business_owner"] as const
+export const USER_KINDS = ["admin", "business_owner", "rider"] as const
 export type UserKind = (typeof USER_KINDS)[number]
 
 export type SignedInUser = {
@@ -9,6 +9,8 @@ export type SignedInUser = {
   email: string
   name: string
   kind: UserKind
+  profileId: string | null
+  businessId: string | null
 }
 
 export const RESERVED_BUSINESS_SLUGS = [
@@ -17,6 +19,7 @@ export const RESERVED_BUSINESS_SLUGS = [
   "logout",
   "admin",
   "api",
+  "rider",
 ] as const
 
 export type DirectoryBusiness = {
@@ -45,6 +48,7 @@ export type StoreProduct = {
   description: string
   price: number
   available: boolean
+  supportsDelivery: boolean
   photoUrl: string | null
 }
 
@@ -64,20 +68,39 @@ export type CreateDirectoryBusinessInput = {
   whatsapp: string
 }
 
-export const ORDER_STATUSES = [
-  "received",
+export const SALE_STATUSES = [
+  "pending",
   "accepted",
-  "out_for_delivery",
-  "ready_for_pickup",
-  "delivered",
-  "picked_up",
-  "rejected",
+  "completed",
   "cancelled",
 ] as const
-export type OrderStatus = (typeof ORDER_STATUSES)[number]
+export type SaleStatus = (typeof SALE_STATUSES)[number]
 
 export const FULFILLMENT_MODES = ["delivery", "pickup"] as const
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number]
+
+export type SaleView = {
+  id: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  buyerName: string
+  buyerPhone: string
+  buyerLocation: string | null
+  fulfillment: FulfillmentMode
+  status: SaleStatus
+  riderName: string | null
+  createdAt: string
+}
+
+export type RiderView = {
+  id: string
+  name: string
+  email: string
+}
+
+export const MAX_SALE_QUANTITY = 99
 
 export const PAYMENT_METHODS = ["cash_on_delivery", "transfer"] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]

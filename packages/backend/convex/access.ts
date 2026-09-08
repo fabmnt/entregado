@@ -13,6 +13,10 @@ export function canManageBusiness(
   )
 }
 
+export function isBusinessManagerKind(kind: SignedInUser["kind"]): boolean {
+  return kind === "admin" || kind === "business_owner"
+}
+
 export async function requireBusinessBySlug(
   ctx: QueryCtx | MutationCtx,
   slug: string
@@ -41,4 +45,31 @@ export async function requireManagedBusiness(
   }
 
   return business
+}
+
+export async function requireRider(ctx: QueryCtx | MutationCtx): Promise<{
+  user: SignedInUser
+  rider: Doc<"users">
+  business: Doc<"businesses">
+}> {
+  const user = await requireSignedInUser(ctx)
+  if (user.kind !== "rider" || !user.profileId || !user.businessId) {
+    throw new ConvexError("FORBIDDEN")
+  }
+
+  const rider = await ctx.db.get("users", user.profileId)
+  if (
+    !rider ||
+    rider.kind !== "rider" ||
+    rider.businessId !== user.businessId
+  ) {
+    throw new ConvexError("FORBIDDEN")
+  }
+
+  const business = await ctx.db.get("businesses", user.businessId)
+  if (!business) {
+    throw new ConvexError("FORBIDDEN")
+  }
+
+  return { user, rider, business }
 }

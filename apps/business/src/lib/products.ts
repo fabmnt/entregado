@@ -21,6 +21,7 @@ export const productFormSchema = z.object({
       return Number.isFinite(parsed) && parsed >= 0
     }, "El precio debe ser 0 o más"),
   available: z.boolean(),
+  supportsDelivery: z.boolean(),
 })
 
 export type ProductFieldErrors = Partial<
@@ -121,6 +122,7 @@ export async function createProduct(
       description: parsed.data.description,
       price: parsePrice(parsed.data.price),
       available: parsed.data.available,
+      supportsDelivery: parsed.data.supportsDelivery,
       ...(photoStorageId ? { photoStorageId } : {}),
     })
     return { ok: true, product }
@@ -168,6 +170,7 @@ export async function updateProduct(
       description: parsed.data.description,
       price: parsePrice(parsed.data.price),
       available: parsed.data.available,
+      supportsDelivery: parsed.data.supportsDelivery,
       clearPhoto: options.clearPhoto,
       ...(options.photoStorageId
         ? { photoStorageId: options.photoStorageId }
