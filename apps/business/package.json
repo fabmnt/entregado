@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit && astro check"
   },
   "dependencies": {
-    "@astrojs/node": "^11.1.5",
     "@astrojs/react": "^5",
+    "@astrojs/vercel": "^11.0.10",
     "@convex-dev/better-auth": "^0.12.5",
     "@entregado/backend": "workspace:*",
     "@entregado/types": "workspace:*",

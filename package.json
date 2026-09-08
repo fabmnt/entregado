@@ -20,7 +20,8 @@
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "turbo": "^2.9.18",
-    "typescript": "~6"
+    "typescript": "~6",
+    "vercel": "^59.11.7"
   },
   "packageManager": "pnpm@10.33.4",
   "engines": {

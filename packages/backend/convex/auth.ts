@@ -12,6 +12,26 @@ import authConfig from "./auth.config"
 const siteUrl = process.env.SITE_URL!
 const authFunctions: AuthFunctions = internal.auth
 
+function getTrustedOrigins(request?: Request): string[] {
+  const origin = request?.headers.get("origin")
+  if (!origin) {
+    return [siteUrl]
+  }
+
+  try {
+    const parsedOrigin = new URL(origin)
+    const isLoopbackOrigin =
+      parsedOrigin.protocol === "http:" &&
+      parsedOrigin.origin === origin &&
+      (parsedOrigin.hostname === "localhost" ||
+        parsedOrigin.hostname === "127.0.0.1")
+
+    return isLoopbackOrigin ? [siteUrl, origin] : [siteUrl]
+  } catch {
+    return [siteUrl]
+  }
+}
+
 export const authComponent = createClient<DataModel>(components.betterAuth, {
   authFunctions,
   triggers: {
@@ -45,6 +65,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     appName: "Entregado",
     baseURL: siteUrl,
+    trustedOrigins: getTrustedOrigins,
     secret: process.env.BETTER_AUTH_SECRET,
     database: authComponent.adapter(ctx),
     emailAndPassword: {
