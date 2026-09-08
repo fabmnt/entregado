@@ -2,6 +2,7 @@
 import { buttonVariants } from "@workspace/ui/components/button"
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -11,48 +12,50 @@ import Layout from "../layouts/main.astro"
 import {
   authErrorMessage,
   fieldErrorsFromZod,
-  signInSchema,
+  signUpSchema,
   type AuthFieldErrors,
 } from "../lib/auth-forms"
 import { postConvexAuth, redirectWithCookies } from "../lib/auth-server"
 
+let name = ""
 let email = ""
 let fieldErrors: AuthFieldErrors = {}
 let formError = ""
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData()
+  name = String(form.get("name") ?? "")
   email = String(form.get("email") ?? "")
-  const parsed = signInSchema.safeParse({
+  const parsed = signUpSchema.safeParse({
+    name,
     email,
     password: String(form.get("password") ?? ""),
   })
 
   if (!parsed.success) {
-    formError = "Revisa el correo y la contraseña"
+    formError = "Revisa los datos de la cuenta"
     fieldErrors = fieldErrorsFromZod(parsed.error)
   } else {
     const response = await postConvexAuth(
       Astro.request,
-      "/api/auth/sign-in/email",
+      "/api/auth/sign-up/email",
       parsed.data
     )
     if (response.ok) {
-      const nextResponse = redirectWithCookies("/admin", response)
-      return nextResponse
+      return redirectWithCookies("/admin", response)
     }
     formError = await authErrorMessage(response)
   }
 }
 ---
 
-<Layout title="Entrar | Entregado">
+<Layout title="Registro | Entregado">
   <main class="mx-auto flex min-h-svh w-full max-w-sm flex-col gap-8 p-6">
     <header class="flex flex-col gap-1">
-      <h1 class="text-xl font-medium">Entrar</h1>
+      <h1 class="text-xl font-medium">Crear cuenta</h1>
       <p class="text-sm text-muted-foreground">
-        Admin general o dueño de negocio. La primera cuenta registrada es admin
-        general.
+        La primera cuenta que se registre es admin general. Las siguientes son
+        de dueño de negocio.
       </p>
     </header>
     <form method="post" class="flex flex-col gap-5">
@@ -64,6 +67,23 @@ if (Astro.request.method === "POST") {
         ) : null
       }
       <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            autoComplete="name"
+            defaultValue={name}
+            required
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "name-error" : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError id="name-error">{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
         <Field data-invalid={fieldErrors.email ? true : undefined}>
           <FieldLabel htmlFor="email">Correo</FieldLabel>
           <Input
@@ -72,11 +92,13 @@ if (Astro.request.method === "POST") {
             type="email"
             autoComplete="email"
             defaultValue={email}
+            required
             aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
           />
           {
             fieldErrors.email ? (
-              <FieldError>{fieldErrors.email}</FieldError>
+              <FieldError id="email-error">{fieldErrors.email}</FieldError>
             ) : null
           }
         </Field>
@@ -86,23 +108,30 @@ if (Astro.request.method === "POST") {
             id="password"
             name="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
+            required
             aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password
+              ? "password-error"
+              : undefined}
           />
+          <FieldDescription>Mínimo 8 caracteres.</FieldDescription>
           {
             fieldErrors.password ? (
-              <FieldError>{fieldErrors.password}</FieldError>
+              <FieldError id="password-error">
+                {fieldErrors.password}
+              </FieldError>
             ) : null
           }
         </Field>
       </FieldGroup>
-      <button class={buttonVariants()} type="submit">Entrar</button>
+      <button class={buttonVariants()} type="submit">Crear cuenta</button>
     </form>
     <p class="text-sm text-muted-foreground">
-      ¿No tienes cuenta?
+      ¿Ya tienes cuenta?
       <a
         class="text-foreground underline-offset-4 hover:underline"
-        href="/register">Regístrate</a
+        href="/login">Entrar</a
       >
     </p>
   </main>

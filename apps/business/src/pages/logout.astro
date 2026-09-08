@@ -6,6 +6,5 @@ if (Astro.request.method !== "POST") {
 }
 
 const response = await postConvexAuth(Astro.request, "/api/auth/sign-out", {})
-const nextResponse = redirectWithCookies("/login", response)
-return nextResponse
+return redirectWithCookies("/login", response)
 ---

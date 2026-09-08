@@ -1,0 +1,283 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import { Textarea } from "@workspace/ui/components/textarea"
+import AdminNav from "../../../../components/admin-nav.astro"
+import Layout from "../../../../layouts/main.astro"
+import {
+  fieldErrorsFromZod,
+  getManagedBusiness,
+} from "../../../../lib/businesses"
+import {
+  imageFieldError,
+  isFilledFile,
+  deleteUploadedImage,
+  uploadImage,
+} from "../../../../lib/images"
+import {
+  deleteProduct,
+  getManagedProduct,
+  productFormSchema,
+  updateProduct,
+  type ProductFieldErrors,
+} from "../../../../lib/products"
+
+const slug = Astro.params.slug
+const productIdParam = Astro.params.productId
+const token = Astro.locals.convexToken
+
+if (!slug || !productIdParam || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const productId = productIdParam as Id<"products">
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+let product: Awaited<ReturnType<typeof getManagedProduct>>
+try {
+  product = await getManagedProduct(slug, productId, token)
+} catch {
+  return new Response(null, { status: 404 })
+}
+if (!product) {
+  return new Response(null, { status: 404 })
+}
+
+let formValues = {
+  name: product.name,
+  description: product.description,
+  price: String(product.price),
+  available: product.available,
+}
+let photoUrl = product.photoUrl
+let fieldErrors: ProductFieldErrors = {}
+let formError = ""
+let saved = false
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const intent = String(form.get("intent") ?? "save")
+
+  if (intent === "delete") {
+    const result = await deleteProduct(slug, productId, token)
+    if (result.ok) {
+      return Astro.redirect(`/admin/${slug}/products`, 303)
+    }
+    formError = result.error
+  } else {
+    formValues = {
+      name: String(form.get("name") ?? ""),
+      description: String(form.get("description") ?? ""),
+      price: String(form.get("price") ?? ""),
+      available: form.get("available") === "on",
+    }
+
+    const clearPhoto = form.get("clearPhoto") === "on"
+    const photo = form.get("photo")
+    let photoStorageId: Awaited<ReturnType<typeof uploadImage>> | undefined
+    let skipSave = false
+
+    const parsed = productFormSchema.safeParse(formValues)
+    if (!parsed.success) {
+      formError = "Revisa los datos del producto"
+      fieldErrors = fieldErrorsFromZod<keyof ProductFieldErrors & string>(
+        parsed.error
+      )
+      skipSave = true
+    } else if (isFilledFile(photo)) {
+      const imageError = imageFieldError(photo)
+      if (imageError) {
+        formError = imageError
+        fieldErrors = { photo: imageError }
+        skipSave = true
+      } else {
+        photoStorageId = await uploadImage(photo, token)
+      }
+    }
+
+    if (parsed.success && !skipSave) {
+      let mutationSucceeded = false
+      try {
+        const result = await updateProduct(
+          slug,
+          productId,
+          parsed.data,
+          token,
+          {
+            photoStorageId,
+            clearPhoto,
+          }
+        )
+        if (result.ok) {
+          mutationSucceeded = true
+          saved = true
+          formValues = {
+            name: result.product.name,
+            description: result.product.description,
+            price: String(result.product.price),
+            available: result.product.available,
+          }
+          photoUrl = result.product.photoUrl
+        } else {
+          formError = result.error
+          fieldErrors = result.fieldErrors
+        }
+      } catch {
+        formError = "No se pudo guardar el producto"
+      } finally {
+        if (!mutationSucceeded && photoStorageId) {
+          const cleanedUp = await deleteUploadedImage(photoStorageId, token)
+          if (!cleanedUp) {
+            formError = `${formError}. No se pudo limpiar la imagen temporal.`
+          }
+        }
+      }
+    }
+  }
+}
+---
+
+<Layout title={`Editar | ${product.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="products" />
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="flex flex-col gap-5"
+    >
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : saved ? (
+          <p class="text-sm text-muted-foreground" role="status">
+            Guardado.
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={formValues.name}
+            required
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "name-error" : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError id="name-error">{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.description ? true : undefined}>
+          <FieldLabel htmlFor="description">Descripción</FieldLabel>
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={formValues.description}
+            required
+            aria-invalid={fieldErrors.description ? true : undefined}
+            aria-describedby={fieldErrors.description
+              ? "description-error"
+              : undefined}
+          />
+          {
+            fieldErrors.description ? (
+              <FieldError id="description-error">
+                {fieldErrors.description}
+              </FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.price ? true : undefined}>
+          <FieldLabel htmlFor="price">Precio (C$)</FieldLabel>
+          <Input
+            id="price"
+            name="price"
+            inputMode="decimal"
+            defaultValue={formValues.price}
+            required
+            aria-invalid={fieldErrors.price ? true : undefined}
+            aria-describedby={fieldErrors.price ? "price-error" : undefined}
+          />
+          {
+            fieldErrors.price ? (
+              <FieldError id="price-error">{fieldErrors.price}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.photo ? true : undefined}>
+          <FieldLabel htmlFor="photo">Foto</FieldLabel>
+          {
+            photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={`Foto de ${product.name}`}
+                class="mb-2 h-24 w-24 object-cover"
+              />
+            ) : null
+          }
+          <Input
+            id="photo"
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-invalid={fieldErrors.photo ? true : undefined}
+            aria-describedby={fieldErrors.photo ? "photo-error" : undefined}
+          />
+          <FieldDescription>JPG, PNG o WebP. Máximo 2 MB.</FieldDescription>
+          {
+            fieldErrors.photo ? (
+              <FieldError id="photo-error">{fieldErrors.photo}</FieldError>
+            ) : null
+          }
+        </Field>
+        {
+          photoUrl ? (
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="clearPhoto" />
+              Quitar foto
+            </label>
+          ) : null
+        }
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="available"
+            checked={formValues.available ? true : undefined}
+          />
+          Visible en la tienda
+        </label>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit" name="intent" value="save">
+        Guardar
+      </button>
+    </form>
+    <form method="post">
+      <button
+        class={buttonVariants({ variant: "destructive" })}
+        type="submit"
+        name="intent"
+        value="delete"
+        onclick="return window.confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')"
+      >
+        Eliminar producto
+      </button>
+    </form>
+  </main>
+</Layout>

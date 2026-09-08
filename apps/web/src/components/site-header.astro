@@ -1,7 +1,11 @@
 ---
+import { getBusinessAppUrl } from "../lib/businesses"
+
+const businessAppUrl = getBusinessAppUrl()
+
 const links = [
   { href: "#businesses", label: "Negocios" },
-  { href: "/login", label: "Entrar" },
+  { href: `${businessAppUrl}/login`, label: "Entrar" },
 ] as const
 ---
 

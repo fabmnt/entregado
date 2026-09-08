@@ -13,12 +13,20 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
-import Layout from "../layouts/main.astro"
+import Layout from "../../layouts/main.astro"
 import {
   createBusiness,
+  createBusinessSchema,
+  fieldErrorsFromZod,
   listManagedBusinesses,
-  type FieldErrors,
-} from "../lib/businesses"
+  type CreateFieldErrors,
+} from "../../lib/businesses"
+import {
+  deleteUploadedImage,
+  imageFieldError,
+  isFilledFile,
+  uploadImage,
+} from "../../lib/images"
 
 const KIND_OPTIONS = [
   { value: "food", label: "Comida" },
@@ -33,6 +41,7 @@ type FormValues = {
   advantages: string
   scope: string
   productPitch: string
+  whatsapp: string
 }
 
 const emptyForm: FormValues = {
@@ -43,10 +52,11 @@ const emptyForm: FormValues = {
   advantages: "",
   scope: "",
   productPitch: "",
+  whatsapp: "",
 }
 
 let formValues = emptyForm
-let fieldErrors: FieldErrors = {}
+let fieldErrors: CreateFieldErrors = {}
 let formError = ""
 
 const token = Astro.locals.convexToken
@@ -66,22 +76,57 @@ if (Astro.request.method === "POST") {
     advantages: String(form.get("advantages") ?? ""),
     scope: String(form.get("scope") ?? ""),
     productPitch: String(form.get("productPitch") ?? ""),
+    whatsapp: String(form.get("whatsapp") ?? ""),
   }
 
-  const result = await createBusiness(formValues, token)
-  if (result.ok) {
-    return Astro.redirect("/admin", 303)
+  const logo = form.get("logo")
+  let logoStorageId: Awaited<ReturnType<typeof uploadImage>> | undefined
+  let skipCreate = false
+  const parsed = createBusinessSchema.safeParse(formValues)
+  if (!parsed.success) {
+    formError = "Revisa los datos del negocio"
+    fieldErrors = fieldErrorsFromZod<keyof CreateFieldErrors & string>(
+      parsed.error
+    )
+    skipCreate = true
+  } else if (isFilledFile(logo)) {
+    const imageError = imageFieldError(logo)
+    if (imageError) {
+      formError = imageError
+      fieldErrors = { logo: imageError }
+      skipCreate = true
+    } else {
+      logoStorageId = await uploadImage(logo, token)
+    }
   }
 
-  formError = result.error
-  fieldErrors = result.fieldErrors
+  if (parsed.success && !skipCreate) {
+    let mutationSucceeded = false
+    try {
+      const result = await createBusiness(parsed.data, token, logoStorageId)
+      if (result.ok) {
+        mutationSucceeded = true
+        return Astro.redirect(`/admin/${result.business.slug}`, 303)
+      }
+
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    } finally {
+      if (!mutationSucceeded && logoStorageId) {
+        const cleanedUp = await deleteUploadedImage(logoStorageId, token)
+        if (!cleanedUp) {
+          formError = `${formError}. No se pudo limpiar la imagen temporal.`
+        }
+      }
+    }
+  }
 }
 
 const listed = await listManagedBusinesses(token)
 const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
 ---
 
-<Layout>
+<Layout title="Negocios | Entregado">
   <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
     <header class="flex flex-col gap-3">
       <div class="flex items-start justify-between gap-4">
@@ -113,7 +158,12 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
         <ul class="flex flex-col gap-3">
           {listed.map((business) => (
             <li class="flex flex-col gap-0.5 border-b border-border pb-3">
-              <span class="text-sm font-medium">{business.name}</span>
+              <a
+                href={`/admin/${business.slug}`}
+                class="text-sm font-medium underline-offset-4 hover:underline"
+              >
+                {business.name}
+              </a>
               <span class="text-sm text-muted-foreground">
                 {business.kind === "pharmacy" ? "Farmacia" : "Comida"} ·{" "}
                 {business.slug}
@@ -124,7 +174,11 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
       )
     }
 
-    <form method="post" class="flex flex-col gap-5">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="flex flex-col gap-5"
+    >
       <h2 class="text-sm font-medium">Nuevo negocio</h2>
       {
         formError ? (
@@ -140,11 +194,13 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="name"
             name="name"
             defaultValue={formValues.name}
+            required
             aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "name-error" : undefined}
           />
           {
             fieldErrors.name ? (
-              <FieldError>{fieldErrors.name}</FieldError>
+              <FieldError id="name-error">{fieldErrors.name}</FieldError>
             ) : null
           }
         </Field>
@@ -154,14 +210,17 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="slug"
             name="slug"
             defaultValue={formValues.slug}
+            required
             aria-invalid={fieldErrors.slug ? true : undefined}
+            aria-describedby={fieldErrors.slug ? "slug-error" : undefined}
           />
           <FieldDescription>
-            Va a ser el subdominio. Solo minúsculas, números y guiones.
+            Dirección de la tienda: /tu-slug. Solo minúsculas, números y
+            guiones. No se puede cambiar después.
           </FieldDescription>
           {
             fieldErrors.slug ? (
-              <FieldError>{fieldErrors.slug}</FieldError>
+              <FieldError id="slug-error">{fieldErrors.slug}</FieldError>
             ) : null
           }
         </Field>
@@ -172,7 +231,9 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             name="kind"
             className="w-full"
             defaultValue={formValues.kind || "food"}
+            required
             aria-invalid={fieldErrors.kind ? true : undefined}
+            aria-describedby={fieldErrors.kind ? "kind-error" : undefined}
           >
             {
               KIND_OPTIONS.map((option) => (
@@ -184,7 +245,48 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
           </NativeSelect>
           {
             fieldErrors.kind ? (
-              <FieldError>{fieldErrors.kind}</FieldError>
+              <FieldError id="kind-error">{fieldErrors.kind}</FieldError>
+            ) : null
+          }
+        </Field>
+        <Field data-invalid={fieldErrors.whatsapp ? true : undefined}>
+          <FieldLabel htmlFor="whatsapp">WhatsApp</FieldLabel>
+          <Input
+            id="whatsapp"
+            name="whatsapp"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            defaultValue={formValues.whatsapp}
+            required
+            aria-invalid={fieldErrors.whatsapp ? true : undefined}
+            aria-describedby={fieldErrors.whatsapp
+              ? "whatsapp-error"
+              : undefined}
+          />
+          <FieldDescription>8 dígitos de Nicaragua.</FieldDescription>
+          {
+            fieldErrors.whatsapp ? (
+              <FieldError id="whatsapp-error">
+                {fieldErrors.whatsapp}
+              </FieldError>
+            ) : null
+          }
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="logo">Logo (opcional)</FieldLabel>
+          <Input
+            id="logo"
+            name="logo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            aria-invalid={fieldErrors.logo ? true : undefined}
+            aria-describedby={fieldErrors.logo ? "logo-error" : undefined}
+          />
+          <FieldDescription>JPG, PNG o WebP. Máximo 2 MB.</FieldDescription>
+          {
+            fieldErrors.logo ? (
+              <FieldError id="logo-error">{fieldErrors.logo}</FieldError>
             ) : null
           }
         </Field>
@@ -194,11 +296,17 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="description"
             name="description"
             defaultValue={formValues.description}
+            required
             aria-invalid={fieldErrors.description ? true : undefined}
+            aria-describedby={fieldErrors.description
+              ? "description-error"
+              : undefined}
           />
           {
             fieldErrors.description ? (
-              <FieldError>{fieldErrors.description}</FieldError>
+              <FieldError id="description-error">
+                {fieldErrors.description}
+              </FieldError>
             ) : null
           }
         </Field>
@@ -208,11 +316,17 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="advantages"
             name="advantages"
             defaultValue={formValues.advantages}
+            required
             aria-invalid={fieldErrors.advantages ? true : undefined}
+            aria-describedby={fieldErrors.advantages
+              ? "advantages-error"
+              : undefined}
           />
           {
             fieldErrors.advantages ? (
-              <FieldError>{fieldErrors.advantages}</FieldError>
+              <FieldError id="advantages-error">
+                {fieldErrors.advantages}
+              </FieldError>
             ) : null
           }
         </Field>
@@ -222,14 +336,16 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="scope"
             name="scope"
             defaultValue={formValues.scope}
+            required
             aria-invalid={fieldErrors.scope ? true : undefined}
+            aria-describedby={fieldErrors.scope ? "scope-error" : undefined}
           />
           <FieldDescription>
             Zona, horario o a quién llega el negocio. Sin mapa todavía.
           </FieldDescription>
           {
             fieldErrors.scope ? (
-              <FieldError>{fieldErrors.scope}</FieldError>
+              <FieldError id="scope-error">{fieldErrors.scope}</FieldError>
             ) : null
           }
         </Field>
@@ -239,14 +355,20 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
             id="productPitch"
             name="productPitch"
             defaultValue={formValues.productPitch}
+            required
             aria-invalid={fieldErrors.productPitch ? true : undefined}
+            aria-describedby={fieldErrors.productPitch
+              ? "product-pitch-error"
+              : undefined}
           />
           <FieldDescription>
             Una frase de promoción. No listes el catálogo.
           </FieldDescription>
           {
             fieldErrors.productPitch ? (
-              <FieldError>{fieldErrors.productPitch}</FieldError>
+              <FieldError id="product-pitch-error">
+                {fieldErrors.productPitch}
+              </FieldError>
             ) : null
           }
         </Field>

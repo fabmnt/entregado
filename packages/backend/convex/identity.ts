@@ -11,7 +11,7 @@ export const signedInUser = v.object({
   kind: userKind,
 })
 
-type SignedInUser = {
+export type SignedInUser = {
   tokenIdentifier: string
   email: string
   name: string

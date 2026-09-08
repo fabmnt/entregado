@@ -11,6 +11,14 @@ export type SignedInUser = {
   kind: UserKind
 }
 
+export const RESERVED_BUSINESS_SLUGS = [
+  "login",
+  "register",
+  "logout",
+  "admin",
+  "api",
+] as const
+
 export type DirectoryBusiness = {
   id: string
   slug: string
@@ -20,13 +28,41 @@ export type DirectoryBusiness = {
   advantages: string
   scope: string
   productPitch: string
+  logoUrl: string | null
   createdAt: string
 }
 
-export type CreateDirectoryBusinessInput = Omit<
-  DirectoryBusiness,
-  "id" | "createdAt"
->
+export type ManagedBusiness = DirectoryBusiness & {
+  whatsapp?: string
+  phone?: string
+  address?: string
+  hours?: string
+}
+
+export type StoreProduct = {
+  id: string
+  name: string
+  description: string
+  price: number
+  available: boolean
+  photoUrl: string | null
+}
+
+export type Storefront = {
+  business: ManagedBusiness
+  products: StoreProduct[]
+}
+
+export type CreateDirectoryBusinessInput = {
+  slug: string
+  name: string
+  kind: BusinessKind
+  description: string
+  advantages: string
+  scope: string
+  productPitch: string
+  whatsapp: string
+}
 
 export const ORDER_STATUSES = [
   "received",
