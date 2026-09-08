@@ -1,0 +1,152 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
+import AdminNav from "../../../components/admin-nav.astro"
+import Layout from "../../../layouts/main.astro"
+import { getManagedBusiness } from "../../../lib/businesses"
+import {
+  cancelSaleAsOwner,
+  completeSaleAsOwner,
+  fulfillmentLabel,
+  listManagedSales,
+  saleStatusLabel,
+  type SaleActionResult,
+} from "../../../lib/sales"
+import type { SaleView } from "@entregado/types"
+
+const slug = Astro.params.slug
+const token = Astro.locals.convexToken
+
+if (!slug || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+let actionError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const saleId = String(form.get("saleId") ?? "") as Id<"sales">
+  const intent = String(form.get("intent") ?? "")
+  let result: SaleActionResult
+
+  if (intent === "complete") {
+    result = await completeSaleAsOwner(slug, saleId, token)
+  } else if (intent === "cancel") {
+    result = await cancelSaleAsOwner(slug, saleId, token)
+  } else {
+    result = { ok: false, error: "Acción no válida" }
+  }
+
+  if (result.ok) {
+    return Astro.redirect(`/admin/${slug}/sales`, 303)
+  }
+  actionError = result.error
+}
+
+const { open, recent } = await listManagedSales(slug, token)
+
+function saleSummary(sale: SaleView) {
+  return `${sale.quantity} × ${sale.productName} · ${formatCordoba(sale.totalPrice)}`
+}
+---
+
+<Layout title={`Ventas | ${business.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="sales" />
+
+    {
+      actionError ? (
+        <p class="text-sm text-destructive" role="alert">
+          {actionError}
+        </p>
+      ) : null
+    }
+
+    <section class="flex flex-col gap-4" aria-labelledby="open-sales-heading">
+      <h2 id="open-sales-heading" class="text-sm font-medium">En curso</h2>
+      {
+        open.length === 0 ? (
+          <p class="text-sm text-muted-foreground">No hay ventas en curso.</p>
+        ) : (
+          <ul class="flex flex-col gap-6">
+            {open.map((sale) => (
+              <li class="flex flex-col gap-2 border-b border-border pb-4">
+                <p class="text-sm font-medium">{saleSummary(sale)}</p>
+                <p class="text-sm text-muted-foreground">
+                  {saleStatusLabel(sale.status)} ·{" "}
+                  {fulfillmentLabel(sale.fulfillment)}
+                  {sale.riderName ? ` · ${sale.riderName}` : ""}
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  {sale.buyerName} · {nicaraguaLocalDigits(sale.buyerPhone)}
+                </p>
+                {sale.buyerLocation ? (
+                  <p class="text-sm text-muted-foreground">
+                    {sale.buyerLocation}
+                  </p>
+                ) : null}
+                <div class="flex flex-wrap gap-3">
+                  {sale.fulfillment === "pickup" ? (
+                    <form method="post">
+                      <input type="hidden" name="saleId" value={sale.id} />
+                      <button
+                        class={buttonVariants()}
+                        type="submit"
+                        name="intent"
+                        value="complete"
+                      >
+                        Completar
+                      </button>
+                    </form>
+                  ) : null}
+                  <form method="post">
+                    <input type="hidden" name="saleId" value={sale.id} />
+                    <button
+                      class={buttonVariants({ variant: "ghost" })}
+                      type="submit"
+                      name="intent"
+                      value="cancel"
+                    >
+                      Cancelar
+                    </button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </section>
+
+    <section class="flex flex-col gap-4" aria-labelledby="recent-sales-heading">
+      <h2 id="recent-sales-heading" class="text-sm font-medium">Recientes</h2>
+      {
+        recent.length === 0 ? (
+          <p class="text-sm text-muted-foreground">
+            Todavía no hay ventas cerradas.
+          </p>
+        ) : (
+          <ul class="flex flex-col gap-3">
+            {recent.map((sale) => (
+              <li class="flex flex-col gap-0.5 border-b border-border pb-3">
+                <p class="text-sm font-medium">{saleSummary(sale)}</p>
+                <p class="text-sm text-muted-foreground">
+                  {saleStatusLabel(sale.status)} ·{" "}
+                  {fulfillmentLabel(sale.fulfillment)}
+                  {" · "}
+                  {sale.buyerName}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </section>
+  </main>
+</Layout>

@@ -2,15 +2,17 @@
 interface Props {
   slug: string
   name: string
-  current: "home" | "profile" | "products"
+  current: "home" | "profile" | "products" | "sales" | "riders"
 }
 
 const { slug, name, current } = Astro.props
 
 const links = [
   { href: `/admin/${slug}`, id: "home", label: "Inicio" },
-  { href: `/admin/${slug}/profile`, id: "profile", label: "Negocio" },
+  { href: `/admin/${slug}/sales`, id: "sales", label: "Ventas" },
   { href: `/admin/${slug}/products`, id: "products", label: "Productos" },
+  { href: `/admin/${slug}/riders`, id: "riders", label: "Repartidores" },
+  { href: `/admin/${slug}/profile`, id: "profile", label: "Negocio" },
 ] as const
 ---
 

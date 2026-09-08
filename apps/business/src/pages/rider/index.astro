@@ -1,0 +1,161 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
+import Layout from "../../layouts/main.astro"
+import {
+  acceptSale,
+  completeSaleAsRider,
+  fulfillmentLabel,
+  listRiderSales,
+} from "../../lib/sales"
+
+const token = Astro.locals.convexToken
+const user = Astro.locals.user
+
+if (!token || !user) {
+  return Astro.redirect("/login", 303)
+}
+
+let actionError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const saleId = String(form.get("saleId") ?? "") as Id<"sales">
+  const intent = String(form.get("intent") ?? "")
+
+  const result =
+    intent === "complete"
+      ? await completeSaleAsRider(saleId, token)
+      : intent === "accept"
+        ? await acceptSale(saleId, token)
+        : { ok: false as const, error: "Acción no válida" }
+
+  if (result.ok) {
+    return Astro.redirect("/rider", 303)
+  }
+  actionError = result.error
+}
+
+const board = await listRiderSales(token)
+---
+
+<Layout title={`Entregas | ${board.businessName}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex items-start justify-between gap-4">
+      <div class="flex flex-col gap-1">
+        <h1 class="text-xl font-medium">Entregas</h1>
+        <p class="text-sm text-muted-foreground">
+          {user.name || user.email} · {board.businessName}
+        </p>
+      </div>
+      <form method="post" action="/logout">
+        <button class={buttonVariants({ variant: "ghost" })} type="submit">
+          Salir
+        </button>
+      </form>
+    </header>
+
+    {
+      actionError ? (
+        <p class="text-sm text-destructive" role="alert">
+          {actionError}
+        </p>
+      ) : null
+    }
+
+    <section class="flex flex-col gap-4" aria-labelledby="current-heading">
+      <h2 id="current-heading" class="text-sm font-medium">Tu entrega</h2>
+      {
+        board.current ? (
+          <div class="flex flex-col gap-2 border-b border-border pb-4">
+            <p class="text-sm font-medium">
+              {board.current.quantity} × {board.current.productName} ·{" "}
+              {formatCordoba(board.current.totalPrice)}
+            </p>
+            <p class="text-sm text-muted-foreground">
+              {board.current.buyerName} ·{" "}
+              {nicaraguaLocalDigits(board.current.buyerPhone)}
+            </p>
+            {board.current.buyerLocation ? (
+              <p class="text-sm">{board.current.buyerLocation}</p>
+            ) : null}
+            <form method="post">
+              <input type="hidden" name="saleId" value={board.current.id} />
+              <button
+                class={buttonVariants()}
+                type="submit"
+                name="intent"
+                value="complete"
+              >
+                Marcar entregado
+              </button>
+            </form>
+          </div>
+        ) : board.pending.length === 0 ? (
+          <p class="text-sm text-muted-foreground">
+            No tienes un pedido en curso.
+          </p>
+        ) : (
+          <p class="text-sm text-muted-foreground">
+            No tienes un pedido aceptado. Toma el recomendado o elige otro.
+          </p>
+        )
+      }
+    </section>
+
+    <section class="flex flex-col gap-4" aria-labelledby="pending-heading">
+      <h2 id="pending-heading" class="text-sm font-medium">Pendientes</h2>
+      {
+        board.pending.length === 0 ? (
+          <p class="text-sm text-muted-foreground">
+            No hay pedidos de delivery pendientes.
+          </p>
+        ) : (
+          <ul class="flex flex-col gap-6">
+            {board.pending.map((sale) => {
+              const isRecommended = sale.id === board.recommendedId
+              return (
+                <li class="flex flex-col gap-2 border-b border-border pb-4">
+                  <p class="text-sm font-medium">
+                    {isRecommended ? "Recomendado · " : ""}
+                    {sale.quantity} × {sale.productName} ·{" "}
+                    {formatCordoba(sale.totalPrice)}
+                  </p>
+                  <p class="text-sm text-muted-foreground">
+                    {fulfillmentLabel(sale.fulfillment)} · {sale.buyerName} ·{" "}
+                    {nicaraguaLocalDigits(sale.buyerPhone)}
+                  </p>
+                  {sale.buyerLocation ? (
+                    <p class="text-sm text-muted-foreground">
+                      {sale.buyerLocation}
+                    </p>
+                  ) : null}
+                  {board.current ? (
+                    <p class="text-sm text-muted-foreground">
+                      Termina la entrega actual para tomar otra.
+                    </p>
+                  ) : (
+                    <form method="post">
+                      <input type="hidden" name="saleId" value={sale.id} />
+                      <button
+                        class={buttonVariants({
+                          variant: isRecommended ? "default" : "outline",
+                        })}
+                        type="submit"
+                        name="intent"
+                        value="accept"
+                      >
+                        Aceptar
+                      </button>
+                    </form>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )
+      }
+    </section>
+  </main>
+</Layout>

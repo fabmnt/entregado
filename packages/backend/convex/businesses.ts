@@ -2,10 +2,11 @@ import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
-import { requireManagedBusiness } from "./access"
+import { isBusinessManagerKind, requireManagedBusiness } from "./access"
 import { deleteStorageIfUnreferenced } from "./files"
 import { requireSignedInUser } from "./identity"
 import { parseNicaraguaE164 } from "./phone"
+import { toStoreProduct } from "./products"
 import {
   businessKind,
   directoryBusiness,
@@ -14,7 +15,14 @@ import {
 } from "./schema"
 
 const DIRECTORY_LIST_LIMIT = 100
-const RESERVED_SLUGS = new Set(["login", "register", "logout", "admin", "api"])
+const RESERVED_SLUGS = new Set([
+  "login",
+  "register",
+  "logout",
+  "admin",
+  "api",
+  "rider",
+])
 
 const createArgs = v.object({
   slug: v.string(),
@@ -136,16 +144,7 @@ export const getStoreBySlug = query({
       .take(DIRECTORY_LIST_LIMIT)
 
     const products = await Promise.all(
-      productRows.map(async (product) => ({
-        id: product._id,
-        name: product.name,
-        description: product.description,
-        price: product.price,
-        available: product.available,
-        photoUrl: product.photoStorageId
-          ? await ctx.storage.getUrl(product.photoStorageId)
-          : null,
-      }))
+      productRows.map((product) => toStoreProduct(ctx, product))
     )
 
     return {
@@ -160,6 +159,9 @@ export const listForSignedIn = query({
   returns: v.array(directoryBusiness),
   handler: async (ctx) => {
     const user = await requireSignedInUser(ctx)
+    if (!isBusinessManagerKind(user.kind)) {
+      throw new ConvexError("FORBIDDEN")
+    }
 
     if (user.kind === "admin") {
       const rows = await ctx.db
@@ -204,6 +206,9 @@ export const create = mutation({
   returns: directoryBusiness,
   handler: async (ctx, args) => {
     const user = await requireSignedInUser(ctx)
+    if (!isBusinessManagerKind(user.kind)) {
+      throw new ConvexError("FORBIDDEN")
+    }
 
     if (RESERVED_SLUGS.has(args.slug)) {
       throw new ConvexError("SLUG_RESERVED")

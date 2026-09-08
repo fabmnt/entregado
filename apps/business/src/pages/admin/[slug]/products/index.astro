@@ -46,6 +46,7 @@ let formValues = {
   description: "",
   price: "",
   available: true,
+  supportsDelivery: true,
 }
 let fieldErrors: ProductFieldErrors = {}
 let formError = ""
@@ -57,6 +58,7 @@ if (Astro.request.method === "POST") {
     description: String(form.get("description") ?? ""),
     price: String(form.get("price") ?? ""),
     available: form.get("available") === "on",
+    supportsDelivery: form.get("supportsDelivery") === "on",
   }
 
   const photo = form.get("photo")
@@ -129,6 +131,7 @@ const products = await listManagedProducts(slug, token)
                 <span class="text-sm text-muted-foreground">
                   {formatCordoba(product.price)}
                   {product.available ? "" : " · Oculto"}
+                  {product.supportsDelivery ? "" : " · Sin delivery"}
                 </span>
               </div>
               <a
@@ -234,6 +237,14 @@ const products = await listManagedProducts(slug, token)
             checked={formValues.available ? true : undefined}
           />
           Visible en la tienda
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="supportsDelivery"
+            checked={formValues.supportsDelivery ? true : undefined}
+          />
+          Se puede entregar a domicilio
         </label>
       </FieldGroup>
       <button class={buttonVariants()} type="submit">Añadir</button>
