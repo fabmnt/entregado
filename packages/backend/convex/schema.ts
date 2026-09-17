@@ -102,6 +102,7 @@ export const riderView = v.object({
   id: v.id("users"),
   name: v.string(),
   email: v.string(),
+  active: v.boolean(),
 })
 
 export default defineSchema({
@@ -111,6 +112,8 @@ export default defineSchema({
     businessId: v.optional(v.id("businesses")),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
+    // Riders created before this flag existed have no value and count as active.
+    active: v.optional(v.boolean()),
   })
     .index("by_auth_user", ["authUserId"])
     .index("by_kind", ["kind"])

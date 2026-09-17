@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values"
 import { authComponent } from "./auth"
-import type { Id } from "./_generated/dataModel"
+import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { query } from "./_generated/server"
 import { userKind } from "./schema"
@@ -12,6 +12,7 @@ export const signedInUser = v.object({
   kind: userKind,
   profileId: v.union(v.id("users"), v.null()),
   businessId: v.union(v.id("businesses"), v.null()),
+  active: v.boolean(),
 })
 
 export type SignedInUser = {
@@ -21,6 +22,11 @@ export type SignedInUser = {
   kind: "admin" | "business_owner" | "rider"
   profileId: Id<"users"> | null
   businessId: Id<"businesses"> | null
+  active: boolean
+}
+
+export function isActiveProfile(row: Doc<"users"> | null | undefined): boolean {
+  return row?.active !== false
 }
 
 export async function getSignedInUser(
@@ -48,6 +54,7 @@ export async function getSignedInUser(
     kind: profile?.kind ?? "business_owner",
     profileId: profile?._id ?? null,
     businessId: profile?.businessId ?? null,
+    active: isActiveProfile(profile),
   }
 }
 

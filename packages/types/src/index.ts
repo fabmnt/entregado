@@ -11,6 +11,7 @@ export type SignedInUser = {
   kind: UserKind
   profileId: string | null
   businessId: string | null
+  active: boolean
 }
 
 export const RESERVED_BUSINESS_SLUGS = [
@@ -20,6 +21,7 @@ export const RESERVED_BUSINESS_SLUGS = [
   "admin",
   "api",
   "rider",
+  "inactive",
 ] as const
 
 export type DirectoryBusiness = {
@@ -98,6 +100,7 @@ export type RiderView = {
   id: string
   name: string
   email: string
+  active: boolean
 }
 
 export const MAX_SALE_QUANTITY = 99
