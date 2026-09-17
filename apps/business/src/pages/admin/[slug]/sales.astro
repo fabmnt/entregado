@@ -13,6 +13,7 @@ import {
   saleStatusLabel,
   type SaleActionResult,
 } from "../../../lib/sales"
+import { buyerNoticeUrl } from "../../../lib/whatsapp"
 import type { SaleView } from "@entregado/types"
 
 const slug = Astro.params.slug
@@ -105,6 +106,14 @@ function saleSummary(sale: SaleView) {
                       </button>
                     </form>
                   ) : null}
+                  <a
+                    class={buttonVariants({ variant: "outline" })}
+                    href={buyerNoticeUrl(sale)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Avisar al cliente
+                  </a>
                   <form method="post">
                     <input type="hidden" name="saleId" value={sale.id} />
                     <button
