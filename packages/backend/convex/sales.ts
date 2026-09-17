@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel"
 import type { QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import {
+  isBusinessSuspended,
   requireBusinessBySlug,
   requireManagedBusiness,
   requireRider,
@@ -197,6 +198,9 @@ export const create = mutation({
   returns: saleView,
   handler: async (ctx, args) => {
     const business = await requireBusinessBySlug(ctx, args.slug)
+    if (isBusinessSuspended(business)) {
+      throw new ConvexError("NOT_FOUND")
+    }
     const product = await ctx.db.get("products", args.productId)
     if (!product || product.businessId !== business._id || !product.available) {
       throw new ConvexError("NOT_FOUND")

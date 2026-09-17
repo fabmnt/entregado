@@ -17,6 +17,10 @@ export function isBusinessManagerKind(kind: SignedInUser["kind"]): boolean {
   return kind === "admin" || kind === "business_owner"
 }
 
+export function isBusinessSuspended(business: Doc<"businesses">): boolean {
+  return business.suspendedAt !== undefined
+}
+
 export async function requireBusinessBySlug(
   ctx: QueryCtx | MutationCtx,
   slug: string
@@ -45,6 +49,17 @@ export async function requireManagedBusiness(
   }
 
   return business
+}
+
+export async function requireAdmin(
+  ctx: QueryCtx | MutationCtx
+): Promise<SignedInUser> {
+  const user = await requireSignedInUser(ctx)
+  if (user.kind !== "admin") {
+    throw new ConvexError("FORBIDDEN")
+  }
+
+  return user
 }
 
 export async function requireRider(ctx: QueryCtx | MutationCtx): Promise<{
