@@ -98,6 +98,13 @@ export const saleView = v.object({
   createdAt: v.string(),
 })
 
+// Buyer-facing receipt view. Adds the close-out timestamps the tracking page
+// needs; PII stays masked by the query that returns it.
+export const publicSaleView = saleView.extend({
+  completedAt: v.union(v.number(), v.null()),
+  cancelledAt: v.union(v.number(), v.null()),
+})
+
 export const riderView = v.object({
   id: v.id("users"),
   name: v.string(),
