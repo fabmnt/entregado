@@ -11,7 +11,7 @@ export const userKind = v.union(
   v.literal("business_owner"),
   v.literal("rider")
 )
-export const saleStatus = v.union(
+export const orderStatus = v.union(
   v.literal("pending"),
   v.literal("accepted"),
   v.literal("completed"),
@@ -83,17 +83,25 @@ export const productFields = v.object({
   photoStorageId: v.optional(v.id("_storage")),
 })
 
-export const saleView = v.object({
-  id: v.id("sales"),
+export const orderItemView = v.object({
+  id: v.id("orderItems"),
+  productId: v.id("products"),
   productName: v.string(),
-  quantity: v.number(),
   unitPrice: v.number(),
+  quantity: v.number(),
+})
+
+export const orderView = v.object({
+  id: v.id("orders"),
+  items: v.array(orderItemView),
+  // Units across every item, so boards show a count without reading the lines.
+  itemCount: v.number(),
   totalPrice: v.number(),
   buyerName: v.string(),
   buyerPhone: v.string(),
   buyerLocation: v.union(v.string(), v.null()),
   fulfillment: fulfillmentMode,
-  status: saleStatus,
+  status: orderStatus,
   riderName: v.union(v.string(), v.null()),
   createdAt: v.string(),
 })
@@ -123,17 +131,14 @@ export default defineSchema({
     .index("by_businessId", ["businessId"])
     .index("by_businessId_and_available", ["businessId", "available"])
     .index("by_photoStorageId", ["photoStorageId"]),
-  sales: defineTable({
+  orders: defineTable({
     businessId: v.id("businesses"),
-    productId: v.id("products"),
-    productName: v.string(),
-    unitPrice: v.number(),
-    quantity: v.number(),
     buyerName: v.string(),
     buyerPhone: v.string(),
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
-    status: saleStatus,
+    status: orderStatus,
+    totalPrice: v.number(),
     riderUserId: v.optional(v.id("users")),
     riderName: v.optional(v.string()),
     completedAt: v.optional(v.number()),
@@ -146,4 +151,11 @@ export default defineSchema({
       "status",
     ])
     .index("by_riderUserId_and_status", ["riderUserId", "status"]),
+  orderItems: defineTable({
+    orderId: v.id("orders"),
+    productId: v.id("products"),
+    productName: v.string(),
+    unitPrice: v.number(),
+    quantity: v.number(),
+  }).index("by_orderId", ["orderId"]),
 })

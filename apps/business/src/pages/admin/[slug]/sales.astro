@@ -1,19 +1,21 @@
 ---
 import type { Id } from "@entregado/backend"
+import type { OrderView } from "@entregado/types"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import AdminNav from "../../../components/admin-nav.astro"
 import Layout from "../../../layouts/main.astro"
 import { getManagedBusiness } from "../../../lib/businesses"
 import {
-  cancelSaleAsOwner,
-  completeSaleAsOwner,
+  cancelOrderAsOwner,
+  completeOrderAsOwner,
   fulfillmentLabel,
-  listManagedSales,
-  saleStatusLabel,
-  type SaleActionResult,
-} from "../../../lib/sales"
-import type { SaleView } from "@entregado/types"
+  listManagedOrders,
+  orderItemLines,
+  orderStatusLabel,
+  orderUnitCountLabel,
+  type OrderActionResult,
+} from "../../../lib/orders"
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
@@ -31,14 +33,14 @@ let actionError = ""
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData()
-  const saleId = String(form.get("saleId") ?? "") as Id<"sales">
+  const orderId = String(form.get("orderId") ?? "") as Id<"orders">
   const intent = String(form.get("intent") ?? "")
-  let result: SaleActionResult
+  let result: OrderActionResult
 
   if (intent === "complete") {
-    result = await completeSaleAsOwner(slug, saleId, token)
+    result = await completeOrderAsOwner(slug, orderId, token)
   } else if (intent === "cancel") {
-    result = await cancelSaleAsOwner(slug, saleId, token)
+    result = await cancelOrderAsOwner(slug, orderId, token)
   } else {
     result = { ok: false, error: "Acción no válida" }
   }
@@ -49,14 +51,14 @@ if (Astro.request.method === "POST") {
   actionError = result.error
 }
 
-const { open, recent } = await listManagedSales(slug, token)
+const { open, recent } = await listManagedOrders(slug, token)
 
-function saleSummary(sale: SaleView) {
-  return `${sale.quantity} × ${sale.productName} · ${formatCordoba(sale.totalPrice)}`
+function orderSummary(order: OrderView) {
+  return `${orderUnitCountLabel(order.itemCount)} · ${formatCordoba(order.totalPrice)}`
 }
 ---
 
-<Layout title={`Ventas | ${business.name}`}>
+<Layout title={`Pedidos | ${business.name}`}>
   <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
     <AdminNav slug={business.slug} name={business.name} current="sales" />
 
@@ -68,33 +70,38 @@ function saleSummary(sale: SaleView) {
       ) : null
     }
 
-    <section class="flex flex-col gap-4" aria-labelledby="open-sales-heading">
-      <h2 id="open-sales-heading" class="text-sm font-medium">En curso</h2>
+    <section class="flex flex-col gap-4" aria-labelledby="open-orders-heading">
+      <h2 id="open-orders-heading" class="text-sm font-medium">En curso</h2>
       {
         open.length === 0 ? (
-          <p class="text-sm text-muted-foreground">No hay ventas en curso.</p>
+          <p class="text-sm text-muted-foreground">No hay pedidos en curso.</p>
         ) : (
           <ul class="flex flex-col gap-6">
-            {open.map((sale) => (
+            {open.map((order) => (
               <li class="flex flex-col gap-2 border-b border-border pb-4">
-                <p class="text-sm font-medium">{saleSummary(sale)}</p>
+                <p class="text-sm font-medium">{orderSummary(order)}</p>
+                <ul class="flex flex-col gap-0.5 text-sm text-muted-foreground">
+                  {orderItemLines(order).map((line) => (
+                    <li>{line}</li>
+                  ))}
+                </ul>
                 <p class="text-sm text-muted-foreground">
-                  {saleStatusLabel(sale.status)} ·{" "}
-                  {fulfillmentLabel(sale.fulfillment)}
-                  {sale.riderName ? ` · ${sale.riderName}` : ""}
+                  {orderStatusLabel(order.status)} ·{" "}
+                  {fulfillmentLabel(order.fulfillment)}
+                  {order.riderName ? ` · ${order.riderName}` : ""}
                 </p>
                 <p class="text-sm text-muted-foreground">
-                  {sale.buyerName} · {nicaraguaLocalDigits(sale.buyerPhone)}
+                  {order.buyerName} · {nicaraguaLocalDigits(order.buyerPhone)}
                 </p>
-                {sale.buyerLocation ? (
+                {order.buyerLocation ? (
                   <p class="text-sm text-muted-foreground">
-                    {sale.buyerLocation}
+                    {order.buyerLocation}
                   </p>
                 ) : null}
                 <div class="flex flex-wrap gap-3">
-                  {sale.fulfillment === "pickup" ? (
+                  {order.fulfillment === "pickup" ? (
                     <form method="post">
-                      <input type="hidden" name="saleId" value={sale.id} />
+                      <input type="hidden" name="orderId" value={order.id} />
                       <button
                         class={buttonVariants()}
                         type="submit"
@@ -106,7 +113,7 @@ function saleSummary(sale: SaleView) {
                     </form>
                   ) : null}
                   <form method="post">
-                    <input type="hidden" name="saleId" value={sale.id} />
+                    <input type="hidden" name="orderId" value={order.id} />
                     <button
                       class={buttonVariants({ variant: "ghost" })}
                       type="submit"
@@ -124,23 +131,29 @@ function saleSummary(sale: SaleView) {
       }
     </section>
 
-    <section class="flex flex-col gap-4" aria-labelledby="recent-sales-heading">
-      <h2 id="recent-sales-heading" class="text-sm font-medium">Recientes</h2>
+    <section
+      class="flex flex-col gap-4"
+      aria-labelledby="recent-orders-heading"
+    >
+      <h2 id="recent-orders-heading" class="text-sm font-medium">Recientes</h2>
       {
         recent.length === 0 ? (
           <p class="text-sm text-muted-foreground">
-            Todavía no hay ventas cerradas.
+            Todavía no hay pedidos cerrados.
           </p>
         ) : (
           <ul class="flex flex-col gap-3">
-            {recent.map((sale) => (
+            {recent.map((order) => (
               <li class="flex flex-col gap-0.5 border-b border-border pb-3">
-                <p class="text-sm font-medium">{saleSummary(sale)}</p>
+                <p class="text-sm font-medium">{orderSummary(order)}</p>
                 <p class="text-sm text-muted-foreground">
-                  {saleStatusLabel(sale.status)} ·{" "}
-                  {fulfillmentLabel(sale.fulfillment)}
+                  {orderItemLines(order).join(", ")}
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  {orderStatusLabel(order.status)} ·{" "}
+                  {fulfillmentLabel(order.fulfillment)}
                   {" · "}
-                  {sale.buyerName}
+                  {order.buyerName}
                 </p>
               </li>
             ))}

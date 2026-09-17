@@ -1,14 +1,15 @@
 import type { Id } from "@entregado/backend"
 import {
   FULFILLMENT_MODES,
-  MAX_SALE_QUANTITY,
+  MAX_ITEM_QUANTITY,
   type FulfillmentMode,
-  type SaleStatus,
-  type SaleView,
+  type OrderStatus,
+  type OrderView,
 } from "@entregado/types"
 import { parseNicaraguaPhone } from "@entregado/utils"
 import { z } from "zod"
 import { fieldErrorsFromZod } from "./businesses"
+import type { CartItem } from "./cart"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
 
@@ -17,14 +18,6 @@ const BUYER_LOCATION_MAX = 500
 
 export const checkoutSchema = z
   .object({
-    quantity: z.coerce
-      .number({ error: "La cantidad no es válida" })
-      .int("La cantidad debe ser un número entero")
-      .min(1, "La cantidad mínima es 1")
-      .max(
-        MAX_SALE_QUANTITY,
-        `La cantidad no puede pasar de ${MAX_SALE_QUANTITY}`
-      ),
     buyerName: z
       .string()
       .trim()
@@ -67,13 +60,13 @@ export type CheckoutFieldErrors = Partial<
 >
 
 export type CheckoutResult =
-  | { ok: true; sale: SaleView }
+  | { ok: true; order: OrderView }
   | { ok: false; status: 400; error: string; fieldErrors: CheckoutFieldErrors }
   | { ok: false; status: 404; error: string; fieldErrors: CheckoutFieldErrors }
 
-export type SaleActionResult = { ok: true } | { ok: false; error: string }
+export type OrderActionResult = { ok: true } | { ok: false; error: string }
 
-export function saleStatusLabel(status: SaleStatus): string {
+export function orderStatusLabel(status: OrderStatus): string {
   if (status === "pending") {
     return "Pendiente"
   }
@@ -90,22 +83,20 @@ export function fulfillmentLabel(fulfillment: FulfillmentMode): string {
   return fulfillment === "delivery" ? "Delivery" : "Retiro"
 }
 
-export async function getStoreProduct(slug: string, productId: Id<"products">) {
-  try {
-    return await getConvexClient().query(api.products.getAvailableForStore, {
-      slug,
-      productId,
-    })
-  } catch {
-    // Malformed ids fail Convex validation before reaching the query.
-    // Return null so storefront pages follow the existing /404 path.
-    return null
-  }
+export function orderItemLines(order: OrderView): string[] {
+  return order.items.map((item) => `${item.quantity} × ${item.productName}`)
 }
 
-export async function getPublicSale(slug: string, saleId: Id<"sales">) {
+export function orderUnitCountLabel(unitCount: number): string {
+  return unitCount === 1 ? "1 artículo" : `${unitCount} artículos`
+}
+
+export async function getPublicOrder(slug: string, orderId: Id<"orders">) {
   try {
-    return await getConvexClient().query(api.sales.getPublic, { slug, saleId })
+    return await getConvexClient().query(api.orders.getPublic, {
+      slug,
+      orderId,
+    })
   } catch {
     // Malformed ids fail Convex validation before reaching the query.
     // Return null so receipt pages follow the existing /404 path.
@@ -113,9 +104,9 @@ export async function getPublicSale(slug: string, saleId: Id<"sales">) {
   }
 }
 
-export async function createSale(
+export async function createOrder(
   slug: string,
-  productId: Id<"products">,
+  items: CartItem[],
   input: unknown
 ): Promise<CheckoutResult> {
   const parsed = checkoutSchema.safeParse(input)
@@ -128,25 +119,44 @@ export async function createSale(
     }
   }
 
+  if (items.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Tu pedido está vacío",
+      fieldErrors: {},
+    }
+  }
+
   const wantsDelivery = parsed.data.fulfillment === "delivery"
 
   try {
-    const sale = await getConvexClient().mutation(api.sales.create, {
+    const order = await getConvexClient().mutation(api.orders.create, {
       slug,
-      productId,
-      quantity: parsed.data.quantity,
+      items: items.map((item) => ({
+        productId: item.productId as Id<"products">,
+        quantity: item.quantity,
+      })),
       buyerName: parsed.data.buyerName,
       buyerPhone: parsed.data.buyerPhone,
       fulfillment: parsed.data.fulfillment,
       ...(wantsDelivery ? { buyerLocation: parsed.data.buyerLocation } : {}),
     })
-    return { ok: true, sale }
+    return { ok: true, order }
   } catch (error) {
     if (isConvexErrorCode(error, "NOT_FOUND")) {
       return {
         ok: false,
         status: 404,
-        error: "Este producto ya no está disponible",
+        error: "Uno de los productos ya no está disponible",
+        fieldErrors: {},
+      }
+    }
+    if (isConvexErrorCode(error, "INVALID_ITEMS")) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Tu pedido está vacío o tiene demasiados productos",
         fieldErrors: {},
       }
     }
@@ -154,9 +164,9 @@ export async function createSale(
       return {
         ok: false,
         status: 400,
-        error: "Revisa la cantidad",
+        error: "Revisa las cantidades",
         fieldErrors: {
-          quantity: `La cantidad debe ser entre 1 y ${MAX_SALE_QUANTITY}`,
+          quantity: `La cantidad debe ser entre 1 y ${MAX_ITEM_QUANTITY}`,
         },
       }
     }
@@ -172,9 +182,9 @@ export async function createSale(
       return {
         ok: false,
         status: 400,
-        error: "Este producto no tiene delivery",
+        error: "Hay productos solo para retiro",
         fieldErrors: {
-          fulfillment: "Este producto solo se retira en el negocio",
+          fulfillment: "Algún producto solo se retira en el negocio",
         },
       }
     }
@@ -200,58 +210,58 @@ export async function createSale(
   }
 }
 
-export async function listManagedSales(slug: string, token: string) {
-  return await getConvexClient(token).query(api.sales.listManaged, { slug })
+export async function listManagedOrders(slug: string, token: string) {
+  return await getConvexClient(token).query(api.orders.listManaged, { slug })
 }
 
-export async function completeSaleAsOwner(
+export async function completeOrderAsOwner(
   slug: string,
-  saleId: Id<"sales">,
+  orderId: Id<"orders">,
   token: string
-): Promise<SaleActionResult> {
+): Promise<OrderActionResult> {
   try {
-    await getConvexClient(token).mutation(api.sales.completeAsOwner, {
+    await getConvexClient(token).mutation(api.orders.completeAsOwner, {
       slug,
-      saleId,
+      orderId,
     })
     return { ok: true }
   } catch (error) {
-    return mapOwnerSaleError(error, "completar")
+    return mapOwnerOrderError(error, "completar")
   }
 }
 
-export async function cancelSaleAsOwner(
+export async function cancelOrderAsOwner(
   slug: string,
-  saleId: Id<"sales">,
+  orderId: Id<"orders">,
   token: string
-): Promise<SaleActionResult> {
+): Promise<OrderActionResult> {
   try {
-    await getConvexClient(token).mutation(api.sales.cancelAsOwner, {
+    await getConvexClient(token).mutation(api.orders.cancelAsOwner, {
       slug,
-      saleId,
+      orderId,
     })
     return { ok: true }
   } catch (error) {
-    return mapOwnerSaleError(error, "cancelar")
+    return mapOwnerOrderError(error, "cancelar")
   }
 }
 
-export async function listRiderSales(token: string) {
-  return await getConvexClient(token).query(api.sales.listForRider, {})
+export async function listRiderOrders(token: string) {
+  return await getConvexClient(token).query(api.orders.listForRider, {})
 }
 
-export async function acceptSale(
-  saleId: Id<"sales">,
+export async function acceptOrder(
+  orderId: Id<"orders">,
   token: string
-): Promise<SaleActionResult> {
+): Promise<OrderActionResult> {
   try {
-    await getConvexClient(token).mutation(api.sales.accept, { saleId })
+    await getConvexClient(token).mutation(api.orders.accept, { orderId })
     return { ok: true }
   } catch (error) {
-    if (isConvexErrorCode(error, "HAS_ACTIVE_SALE")) {
+    if (isConvexErrorCode(error, "HAS_ACTIVE_ORDER")) {
       return { ok: false, error: "Termina la entrega actual para tomar otra" }
     }
-    if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
+    if (isConvexErrorCode(error, "ORDER_NOT_AVAILABLE")) {
       return { ok: false, error: "Ese pedido ya no está disponible" }
     }
     if (
@@ -264,15 +274,17 @@ export async function acceptSale(
   }
 }
 
-export async function completeSaleAsRider(
-  saleId: Id<"sales">,
+export async function completeOrderAsRider(
+  orderId: Id<"orders">,
   token: string
-): Promise<SaleActionResult> {
+): Promise<OrderActionResult> {
   try {
-    await getConvexClient(token).mutation(api.sales.completeAsRider, { saleId })
+    await getConvexClient(token).mutation(api.orders.completeAsRider, {
+      orderId,
+    })
     return { ok: true }
   } catch (error) {
-    if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
+    if (isConvexErrorCode(error, "ORDER_NOT_AVAILABLE")) {
       return { ok: false, error: "Ese pedido ya no está en entrega" }
     }
     if (
@@ -285,11 +297,11 @@ export async function completeSaleAsRider(
   }
 }
 
-function mapOwnerSaleError(error: unknown, action: string): SaleActionResult {
-  if (isConvexErrorCode(error, "SALE_NOT_OPEN")) {
-    return { ok: false, error: "Esa venta ya está cerrada" }
+function mapOwnerOrderError(error: unknown, action: string): OrderActionResult {
+  if (isConvexErrorCode(error, "ORDER_NOT_OPEN")) {
+    return { ok: false, error: "Ese pedido ya está cerrado" }
   }
-  if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
+  if (isConvexErrorCode(error, "ORDER_NOT_AVAILABLE")) {
     return { ok: false, error: "Solo los retiros se completan aquí" }
   }
   if (isConvexErrorCode(error, "UNAUTHENTICATED")) {
@@ -299,7 +311,7 @@ function mapOwnerSaleError(error: unknown, action: string): SaleActionResult {
     isConvexErrorCode(error, "FORBIDDEN") ||
     isConvexErrorCode(error, "NOT_FOUND")
   ) {
-    return { ok: false, error: `No puedes ${action} esta venta` }
+    return { ok: false, error: `No puedes ${action} este pedido` }
   }
-  return { ok: false, error: `No se pudo ${action} la venta` }
+  return { ok: false, error: `No se pudo ${action} el pedido` }
 }

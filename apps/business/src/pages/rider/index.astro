@@ -4,11 +4,13 @@ import { buttonVariants } from "@workspace/ui/components/button"
 import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import Layout from "../../layouts/main.astro"
 import {
-  acceptSale,
-  completeSaleAsRider,
+  acceptOrder,
+  completeOrderAsRider,
   fulfillmentLabel,
-  listRiderSales,
-} from "../../lib/sales"
+  listRiderOrders,
+  orderItemLines,
+  orderUnitCountLabel,
+} from "../../lib/orders"
 
 const token = Astro.locals.convexToken
 const user = Astro.locals.user
@@ -21,14 +23,14 @@ let actionError = ""
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData()
-  const saleId = String(form.get("saleId") ?? "") as Id<"sales">
+  const orderId = String(form.get("orderId") ?? "") as Id<"orders">
   const intent = String(form.get("intent") ?? "")
 
   const result =
     intent === "complete"
-      ? await completeSaleAsRider(saleId, token)
+      ? await completeOrderAsRider(orderId, token)
       : intent === "accept"
-        ? await acceptSale(saleId, token)
+        ? await acceptOrder(orderId, token)
         : { ok: false as const, error: "Acción no válida" }
 
   if (result.ok) {
@@ -37,7 +39,7 @@ if (Astro.request.method === "POST") {
   actionError = result.error
 }
 
-const board = await listRiderSales(token)
+const board = await listRiderOrders(token)
 ---
 
 <Layout title={`Entregas | ${board.businessName}`}>
@@ -70,9 +72,14 @@ const board = await listRiderSales(token)
         board.current ? (
           <div class="flex flex-col gap-2 border-b border-border pb-4">
             <p class="text-sm font-medium">
-              {board.current.quantity} × {board.current.productName} ·{" "}
+              {orderUnitCountLabel(board.current.itemCount)} · A cobrar{" "}
               {formatCordoba(board.current.totalPrice)}
             </p>
+            <ul class="flex flex-col gap-0.5 text-sm text-muted-foreground">
+              {orderItemLines(board.current).map((line) => (
+                <li>{line}</li>
+              ))}
+            </ul>
             <p class="text-sm text-muted-foreground">
               {board.current.buyerName} ·{" "}
               {nicaraguaLocalDigits(board.current.buyerPhone)}
@@ -81,7 +88,7 @@ const board = await listRiderSales(token)
               <p class="text-sm">{board.current.buyerLocation}</p>
             ) : null}
             <form method="post">
-              <input type="hidden" name="saleId" value={board.current.id} />
+              <input type="hidden" name="orderId" value={board.current.id} />
               <button
                 class={buttonVariants()}
                 type="submit"
@@ -113,22 +120,27 @@ const board = await listRiderSales(token)
           </p>
         ) : (
           <ul class="flex flex-col gap-6">
-            {board.pending.map((sale) => {
-              const isRecommended = sale.id === board.recommendedId
+            {board.pending.map((order) => {
+              const isRecommended = order.id === board.recommendedId
               return (
                 <li class="flex flex-col gap-2 border-b border-border pb-4">
                   <p class="text-sm font-medium">
                     {isRecommended ? "Recomendado · " : ""}
-                    {sale.quantity} × {sale.productName} ·{" "}
-                    {formatCordoba(sale.totalPrice)}
+                    {orderUnitCountLabel(order.itemCount)} · A cobrar{" "}
+                    {formatCordoba(order.totalPrice)}
                   </p>
+                  <ul class="flex flex-col gap-0.5 text-sm text-muted-foreground">
+                    {orderItemLines(order).map((line) => (
+                      <li>{line}</li>
+                    ))}
+                  </ul>
                   <p class="text-sm text-muted-foreground">
-                    {fulfillmentLabel(sale.fulfillment)} · {sale.buyerName} ·{" "}
-                    {nicaraguaLocalDigits(sale.buyerPhone)}
+                    {fulfillmentLabel(order.fulfillment)} · {order.buyerName} ·{" "}
+                    {nicaraguaLocalDigits(order.buyerPhone)}
                   </p>
-                  {sale.buyerLocation ? (
+                  {order.buyerLocation ? (
                     <p class="text-sm text-muted-foreground">
-                      {sale.buyerLocation}
+                      {order.buyerLocation}
                     </p>
                   ) : null}
                   {board.current ? (
@@ -137,7 +149,7 @@ const board = await listRiderSales(token)
                     </p>
                   ) : (
                     <form method="post">
-                      <input type="hidden" name="saleId" value={sale.id} />
+                      <input type="hidden" name="orderId" value={order.id} />
                       <button
                         class={buttonVariants({
                           variant: isRecommended ? "default" : "outline",
