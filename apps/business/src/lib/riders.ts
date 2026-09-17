@@ -26,8 +26,17 @@ export type CreateRiderResult =
   | { ok: false; status: 403; error: string; fieldErrors: RiderFieldErrors }
   | { ok: false; status: 409; error: string; fieldErrors: RiderFieldErrors }
 
-export async function listManagedRiders(slug: string, token: string) {
-  return await getConvexClient(token).query(api.riders.listManaged, { slug })
+const RIDER_PAGE_SIZE = 20
+
+export async function listManagedRiders(
+  slug: string,
+  token: string,
+  cursor: string | null
+) {
+  return await getConvexClient(token).query(api.riders.listManaged, {
+    slug,
+    paginationOpts: { numItems: RIDER_PAGE_SIZE, cursor },
+  })
 }
 
 export async function createRider(

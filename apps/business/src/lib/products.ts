@@ -71,11 +71,17 @@ function mapProductError(error: unknown): ProductMutationResult | null {
   return null
 }
 
+const PRODUCT_PAGE_SIZE = 20
+
 export async function listManagedProducts(
   slug: string,
-  token: string
-): Promise<StoreProduct[]> {
-  return await getConvexClient(token).query(api.products.listManaged, { slug })
+  token: string,
+  cursor: string | null
+) {
+  return await getConvexClient(token).query(api.products.listManaged, {
+    slug,
+    paginationOpts: { numItems: PRODUCT_PAGE_SIZE, cursor },
+  })
 }
 
 export async function getManagedProduct(

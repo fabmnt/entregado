@@ -1,8 +1,12 @@
 import type { DirectoryBusiness } from "@entregado/types"
 import { api, getConvexClient } from "./convex"
 
-export async function listBusinesses(): Promise<DirectoryBusiness[]> {
-  return await getConvexClient().query(api.businesses.list, {})
+const DIRECTORY_PAGE_SIZE = 12
+
+export async function listBusinesses(cursor: string | null) {
+  return await getConvexClient().query(api.businesses.list, {
+    paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor },
+  })
 }
 
 export async function getBusinessBySlug(

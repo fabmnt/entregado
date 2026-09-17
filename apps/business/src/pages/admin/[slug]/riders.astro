@@ -9,6 +9,7 @@ import {
 } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
 import AdminNav from "../../../components/admin-nav.astro"
+import PaginationNav from "../../../components/pagination-nav.astro"
 import Layout from "../../../layouts/main.astro"
 import { fieldErrorsFromZod, getManagedBusiness } from "../../../lib/businesses"
 import {
@@ -20,6 +21,7 @@ import {
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!slug || !token) {
   return new Response(null, { status: 404 })
@@ -60,7 +62,7 @@ if (Astro.request.method === "POST") {
   }
 }
 
-const riders = await listManagedRiders(slug, token)
+const riders = await listManagedRiders(slug, token, cursor)
 ---
 
 <Layout title={`Repartidores | ${business.name}`}>
@@ -68,13 +70,13 @@ const riders = await listManagedRiders(slug, token)
     <AdminNav slug={business.slug} name={business.name} current="riders" />
 
     {
-      riders.length === 0 ? (
+      riders.page.length === 0 ? (
         <p class="text-sm text-muted-foreground">
           Todavía no hay repartidores.
         </p>
       ) : (
         <ul class="flex flex-col gap-3">
-          {riders.map((rider) => (
+          {riders.page.map((rider) => (
             <li class="flex flex-col gap-0.5 border-b border-border pb-3">
               <span class="text-sm font-medium">{rider.name}</span>
               <span class="text-sm text-muted-foreground">{rider.email}</span>
@@ -83,6 +85,13 @@ const riders = await listManagedRiders(slug, token)
         </ul>
       )
     }
+
+    <PaginationNav
+      basePath={`/admin/${slug}/riders`}
+      cursor={cursor}
+      isDone={riders.isDone}
+      continueCursor={riders.continueCursor}
+    />
 
     <form method="post" class="flex flex-col gap-5">
       <h2 class="text-sm font-medium">Nuevo repartidor</h2>

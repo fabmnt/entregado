@@ -200,8 +200,17 @@ export async function createSale(
   }
 }
 
-export async function listManagedSales(slug: string, token: string) {
-  return await getConvexClient(token).query(api.sales.listManaged, { slug })
+const OPEN_SALE_PAGE_SIZE = 20
+
+export async function listManagedSales(
+  slug: string,
+  token: string,
+  cursor: string | null
+) {
+  return await getConvexClient(token).query(api.sales.listManaged, {
+    slug,
+    paginationOpts: { numItems: OPEN_SALE_PAGE_SIZE, cursor },
+  })
 }
 
 export async function completeSaleAsOwner(

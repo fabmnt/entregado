@@ -1,10 +1,13 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
 import { mutation, query } from "./_generated/server"
 import { requireManagedBusiness } from "./access"
 import { createAuth } from "./auth"
 import { riderView } from "./schema"
 
-const RIDER_LIST_LIMIT = 50
 const RIDER_NAME_MAX = 80
 
 function isDuplicateUserError(error: unknown): boolean {
@@ -36,22 +39,26 @@ function isDuplicateUserError(error: unknown): boolean {
 }
 
 export const listManaged = query({
-  args: { slug: v.string() },
-  returns: v.array(riderView),
+  args: { slug: v.string(), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(riderView),
   handler: async (ctx, args) => {
     const business = await requireManagedBusiness(ctx, args.slug)
-    const rows = await ctx.db
+    const result = await ctx.db
       .query("users")
-      .withIndex("by_businessId", (q) => q.eq("businessId", business._id))
-      .take(RIDER_LIST_LIMIT)
+      .withIndex("by_businessId_and_kind", (q) =>
+        q.eq("businessId", business._id).eq("kind", "rider")
+      )
+      .order("desc")
+      .paginate(args.paginationOpts)
 
-    return rows
-      .filter((row) => row.kind === "rider")
-      .map((row) => ({
+    return {
+      ...result,
+      page: result.page.map((row) => ({
         id: row._id,
         name: row.name ?? "",
         email: row.email ?? "",
-      }))
+      })),
+    }
   },
 })
 

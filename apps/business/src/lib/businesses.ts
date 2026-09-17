@@ -125,10 +125,15 @@ export type UpdateProfileResult =
   | { ok: false; status: 401; error: string; fieldErrors: ProfileFieldErrors }
   | { ok: false; status: 403; error: string; fieldErrors: ProfileFieldErrors }
 
+const BUSINESS_PAGE_SIZE = 20
+
 export async function listManagedBusinesses(
-  token: string
-): Promise<DirectoryBusiness[]> {
-  return await getConvexClient(token).query(api.businesses.listForSignedIn, {})
+  token: string,
+  cursor: string | null
+) {
+  return await getConvexClient(token).query(api.businesses.listForSignedIn, {
+    paginationOpts: { numItems: BUSINESS_PAGE_SIZE, cursor },
+  })
 }
 
 export async function getManagedBusiness(
