@@ -295,6 +295,9 @@ export async function acceptSale(
     await getConvexClient(token).mutation(api.sales.accept, { saleId })
     return { ok: true }
   } catch (error) {
+    if (isConvexErrorCode(error, "RIDER_INACTIVE")) {
+      return { ok: false, error: "Tu cuenta está desactivada" }
+    }
     if (isConvexErrorCode(error, "HAS_ACTIVE_SALE")) {
       return { ok: false, error: "Termina la entrega actual para tomar otra" }
     }
@@ -319,6 +322,9 @@ export async function completeSaleAsRider(
     await getConvexClient(token).mutation(api.sales.completeAsRider, { saleId })
     return { ok: true }
   } catch (error) {
+    if (isConvexErrorCode(error, "RIDER_INACTIVE")) {
+      return { ok: false, error: "Tu cuenta está desactivada" }
+    }
     if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
       return { ok: false, error: "Ese pedido ya no está en entrega" }
     }

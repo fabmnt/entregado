@@ -1,0 +1,30 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import Layout from "../layouts/main.astro"
+
+const user = Astro.locals.user
+
+if (!user) {
+  return Astro.redirect("/login", 303)
+}
+---
+
+<Layout title="Cuenta desactivada | Entregado">
+  <main class="mx-auto flex min-h-svh w-full max-w-sm flex-col gap-8 p-6">
+    <header class="flex flex-col gap-1">
+      <h1 class="text-xl font-medium">Cuenta desactivada</h1>
+      <p class="text-sm text-muted-foreground">
+        Tu cuenta de repartidor está desactivada. El negocio no te asigna
+        entregas por ahora.
+      </p>
+    </header>
+    <p class="text-sm">
+      Pídele al negocio que reactive tu cuenta para volver a recibir pedidos.
+    </p>
+    <form method="post" action="/logout">
+      <button class={buttonVariants({ variant: "outline" })} type="submit">
+        Salir
+      </button>
+    </form>
+  </main>
+</Layout>
