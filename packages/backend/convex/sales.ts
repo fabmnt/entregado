@@ -9,7 +9,12 @@ import {
 } from "./access"
 import { parseNicaraguaE164 } from "./phone"
 import { productSupportsDelivery } from "./products"
-import { fulfillmentMode, paymentMethod, saleView } from "./schema"
+import {
+  fulfillmentMode,
+  paymentMethod,
+  publicSaleView,
+  saleView,
+} from "./schema"
 
 const SALE_LIST_LIMIT = 100
 const MAX_QUANTITY = 99
@@ -69,6 +74,8 @@ function toPublicSaleView(doc: Doc<"sales">) {
     ...view,
     buyerPhone: maskBuyerPhone(view.buyerPhone),
     buyerLocation: null,
+    completedAt: doc.completedAt ?? null,
+    cancelledAt: doc.cancelledAt ?? null,
   }
 }
 
@@ -92,7 +99,7 @@ async function listByFulfillmentAndStatus(
 
 export const getPublic = query({
   args: { slug: v.string(), saleId: v.id("sales") },
-  returns: v.union(saleView, v.null()),
+  returns: v.union(publicSaleView, v.null()),
   handler: async (ctx, args) => {
     const business = await ctx.db
       .query("businesses")
