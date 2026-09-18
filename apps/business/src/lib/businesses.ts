@@ -152,6 +152,28 @@ export async function getStorefront(slug: string): Promise<Storefront | null> {
   return await getConvexClient().query(api.businesses.getStoreBySlug, { slug })
 }
 
+const SUSPENSION_DATE_FORMAT = new Intl.DateTimeFormat("es-NI", {
+  dateStyle: "long",
+  timeZone: "America/Managua",
+})
+
+export function isBusinessSuspended(business: ManagedBusiness): boolean {
+  return business.suspendedAt !== null
+}
+
+export function suspensionLabel(business: ManagedBusiness): string | null {
+  if (business.suspendedAt === null) {
+    return null
+  }
+
+  const suspendedOn = `Suspendido el ${SUSPENSION_DATE_FORMAT.format(
+    new Date(business.suspendedAt)
+  )}`
+  return business.suspensionReason
+    ? `${suspendedOn} · ${business.suspensionReason}`
+    : suspendedOn
+}
+
 export async function createBusiness(
   input: unknown,
   token: string | null,

@@ -6,7 +6,7 @@ import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
-import { requireManagedBusiness } from "./access"
+import { isBusinessSuspended, requireManagedBusiness } from "./access"
 import { deleteStorageIfUnreferenced } from "./files"
 import { storeProduct } from "./schema"
 
@@ -78,7 +78,7 @@ export const getAvailableForStore = query({
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    if (!business) {
+    if (!business || isBusinessSuspended(business)) {
       return null
     }
 

@@ -42,6 +42,8 @@ export type ManagedBusiness = DirectoryBusiness & {
   phone?: string
   address?: string
   hours?: string
+  suspendedAt: number | null
+  suspensionReason: string | null
 }
 
 export type StoreProduct = {

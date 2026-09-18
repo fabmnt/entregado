@@ -1,0 +1,114 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Textarea } from "@workspace/ui/components/textarea"
+import Layout from "../../../layouts/main.astro"
+import { suspendBusiness, type SuspendFieldErrors } from "../../../lib/admin"
+import {
+  getManagedBusiness,
+  isBusinessSuspended,
+} from "../../../lib/businesses"
+
+const slug = Astro.params.slug
+const token = Astro.locals.convexToken
+const user = Astro.locals.user
+
+if (!slug || !token || !user) {
+  return new Response(null, { status: 404 })
+}
+
+if (user.kind !== "admin") {
+  return new Response(null, { status: 404 })
+}
+
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+if (isBusinessSuspended(business)) {
+  return Astro.redirect("/admin/directory", 303)
+}
+
+let formValues = { reason: "" }
+let fieldErrors: SuspendFieldErrors = {}
+let formError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  formValues = { reason: String(form.get("reason") ?? "") }
+
+  const result = await suspendBusiness(slug, formValues, token)
+  if (result.ok) {
+    return Astro.redirect("/admin/directory", 303)
+  }
+  formError = result.error
+  fieldErrors = result.fieldErrors
+}
+---
+
+<Layout title={`Suspender ${business.name} | Entregado`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex flex-col gap-2">
+      <a
+        href="/admin/directory"
+        class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        Directorio
+      </a>
+      <h1 class="text-xl font-medium">Suspender {business.name}</h1>
+      <p class="text-sm text-muted-foreground">
+        La tienda deja de aparecer en el directorio y no recibe pedidos nuevos.
+        El dueño sigue entrando a su panel.
+      </p>
+    </header>
+
+    <form method="post" class="flex flex-col gap-5">
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.reason ? true : undefined}>
+          <FieldLabel htmlFor="reason">Motivo</FieldLabel>
+          <Textarea
+            id="reason"
+            name="reason"
+            defaultValue={formValues.reason}
+            required
+            aria-invalid={fieldErrors.reason ? true : undefined}
+            aria-describedby={fieldErrors.reason ? "reason-error" : undefined}
+          />
+          <FieldDescription>
+            Queda guardado para saber por qué se suspendió.
+          </FieldDescription>
+          {
+            fieldErrors.reason ? (
+              <FieldError id="reason-error">{fieldErrors.reason}</FieldError>
+            ) : null
+          }
+        </Field>
+      </FieldGroup>
+      <div class="flex flex-wrap gap-3">
+        <button
+          class={buttonVariants({ variant: "destructive" })}
+          type="submit"
+        >
+          Suspender negocio
+        </button>
+        <a href="/admin/directory" class={buttonVariants({ variant: "ghost" })}>
+          Cancelar
+        </a>
+      </div>
+    </form>
+  </main>
+</Layout>

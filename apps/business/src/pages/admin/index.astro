@@ -145,12 +145,18 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
         </form>
       </div>
       <p class="text-sm text-muted-foreground">
-        {
-          user.kind === "admin"
-            ? "Ves todos los negocios del directorio."
-            : "Ves los negocios que registraste."
-        }
+        Ves los negocios que registraste.
       </p>
+      {
+        user.kind === "admin" ? (
+          <a
+            href="/admin/directory"
+            class="w-fit text-sm font-medium underline-offset-4 hover:underline"
+          >
+            Administrar el directorio
+          </a>
+        ) : null
+      }
     </header>
 
     {

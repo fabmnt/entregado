@@ -41,6 +41,8 @@ export const businessFields = v.object({
   hours: v.optional(v.string()),
   logoStorageId: v.optional(v.id("_storage")),
   ownerTokenIdentifier: v.optional(v.string()),
+  suspendedAt: v.optional(v.number()),
+  suspensionReason: v.optional(v.string()),
 })
 
 export const directoryBusiness = v.object({
@@ -61,6 +63,8 @@ export const managedBusiness = directoryBusiness.extend({
   phone: v.optional(v.string()),
   address: v.optional(v.string()),
   hours: v.optional(v.string()),
+  suspendedAt: v.union(v.number(), v.null()),
+  suspensionReason: v.union(v.string(), v.null()),
 })
 
 export const storeProduct = v.object({
@@ -136,7 +140,8 @@ export default defineSchema({
   businesses: defineTable(businessFields)
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerTokenIdentifier"])
-    .index("by_logoStorageId", ["logoStorageId"]),
+    .index("by_logoStorageId", ["logoStorageId"])
+    .index("by_suspendedAt", ["suspendedAt"]),
   products: defineTable(productFields)
     .index("by_businessId", ["businessId"])
     .index("by_businessId_and_available", ["businessId", "available"])

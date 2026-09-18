@@ -1,0 +1,122 @@
+---
+import { buttonVariants } from "@workspace/ui/components/button"
+import Layout from "../../layouts/main.astro"
+import PaginationNav from "../../components/pagination-nav.astro"
+import { listAdminBusinesses, reactivateBusiness } from "../../lib/admin"
+import { isBusinessSuspended, suspensionLabel } from "../../lib/businesses"
+
+const token = Astro.locals.convexToken
+const user = Astro.locals.user
+const cursor = Astro.url.searchParams.get("cursor")
+
+if (!token || !user) {
+  return Astro.redirect("/login", 303)
+}
+
+if (user.kind !== "admin") {
+  return new Response(null, { status: 404 })
+}
+
+let actionError = ""
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const slug = String(form.get("slug") ?? "")
+  const result = await reactivateBusiness(slug, token)
+
+  if (result.ok) {
+    return Astro.redirect("/admin/directory", 303)
+  }
+  actionError = result.error
+}
+
+const businesses = await listAdminBusinesses(token, cursor)
+---
+
+<Layout title="Directorio | Entregado">
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <header class="flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col gap-1">
+          <a
+            href="/admin"
+            class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Mis negocios
+          </a>
+          <h1 class="text-xl font-medium">Directorio</h1>
+        </div>
+        <form method="post" action="/logout">
+          <button class={buttonVariants({ variant: "ghost" })} type="submit">
+            Salir
+          </button>
+        </form>
+      </div>
+      <p class="text-sm text-muted-foreground">
+        {user.email} · Admin general. Suspende o reactiva cualquier negocio.
+      </p>
+    </header>
+
+    {
+      actionError ? (
+        <p class="text-sm text-destructive" role="alert">
+          {actionError}
+        </p>
+      ) : null
+    }
+
+    {
+      businesses.page.length === 0 ? (
+        <p class="text-sm text-muted-foreground">Todavía no hay negocios.</p>
+      ) : (
+        <ul class="flex flex-col gap-4">
+          {businesses.page.map((business) => (
+            <li class="flex items-start justify-between gap-4 border-b border-border pb-4">
+              <div class="flex min-w-0 flex-col gap-0.5">
+                <a
+                  href={`/admin/${business.slug}`}
+                  class="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  {business.name}
+                </a>
+                <span class="text-sm text-muted-foreground">
+                  {business.kind === "pharmacy" ? "Farmacia" : "Comida"} ·{" "}
+                  {business.slug}
+                </span>
+                {isBusinessSuspended(business) ? (
+                  <span class="text-sm text-destructive">
+                    {suspensionLabel(business)}
+                  </span>
+                ) : (
+                  <span class="text-sm text-muted-foreground">Activo</span>
+                )}
+              </div>
+              {isBusinessSuspended(business) ? (
+                <form method="post">
+                  <input type="hidden" name="slug" value={business.slug} />
+                  <button class={buttonVariants()} type="submit">
+                    Reactivar
+                  </button>
+                </form>
+              ) : (
+                <a
+                  href={`/admin/directory/${business.slug}`}
+                  class={buttonVariants({ variant: "outline" })}
+                >
+                  Suspender
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    <PaginationNav
+      basePath="/admin/directory"
+      cursor={cursor}
+      isDone={businesses.isDone}
+      continueCursor={businesses.continueCursor}
+    />
+  </main>
+</Layout>

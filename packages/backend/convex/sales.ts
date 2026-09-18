@@ -6,6 +6,7 @@ import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
 import {
+  isBusinessSuspended,
   requireBusinessBySlug,
   requireManagedBusiness,
   requireRider,
@@ -91,7 +92,7 @@ export const getPublic = query({
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    if (!business) {
+    if (!business || isBusinessSuspended(business)) {
       return null
     }
 
@@ -186,6 +187,9 @@ export const create = mutation({
   returns: saleView,
   handler: async (ctx, args) => {
     const business = await requireBusinessBySlug(ctx, args.slug)
+    if (isBusinessSuspended(business)) {
+      throw new ConvexError("NOT_FOUND")
+    }
     const product = await ctx.db.get("products", args.productId)
     if (!product || product.businessId !== business._id || !product.available) {
       throw new ConvexError("NOT_FOUND")
