@@ -12,7 +12,12 @@ import {
 } from "./access"
 import { parseNicaraguaE164 } from "./phone"
 import { productSupportsDelivery } from "./products"
-import { fulfillmentMode, saleView } from "./schema"
+import {
+  fulfillmentMode,
+  paymentMethod,
+  publicSaleView,
+  saleView,
+} from "./schema"
 
 const SALE_LIST_LIMIT = 100
 const RECENT_SALE_LIMIT = 10
@@ -32,6 +37,8 @@ function toSaleView(doc: Doc<"sales">) {
     buyerLocation: doc.buyerLocation ?? null,
     fulfillment: doc.fulfillment,
     status: doc.status,
+    paymentMethod: doc.paymentMethod ?? null,
+    paymentStatus: doc.paymentStatus ?? "pending",
     riderName: doc.riderName ?? null,
     createdAt: new Date(doc._creationTime).toISOString(),
   }
@@ -71,12 +78,14 @@ function toPublicSaleView(doc: Doc<"sales">) {
     ...view,
     buyerPhone: maskBuyerPhone(view.buyerPhone),
     buyerLocation: null,
+    completedAt: doc.completedAt ?? null,
+    cancelledAt: doc.cancelledAt ?? null,
   }
 }
 
 export const getPublic = query({
   args: { slug: v.string(), saleId: v.id("sales") },
-  returns: v.union(saleView, v.null()),
+  returns: v.union(publicSaleView, v.null()),
   handler: async (ctx, args) => {
     const business = await ctx.db
       .query("businesses")
@@ -172,6 +181,7 @@ export const create = mutation({
     buyerPhone: v.string(),
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
+    paymentMethod: paymentMethod,
   },
   returns: saleView,
   handler: async (ctx, args) => {
@@ -213,6 +223,8 @@ export const create = mutation({
       fulfillment: wantsDelivery ? "delivery" : "pickup",
       status: "pending",
       open: true,
+      paymentMethod: args.paymentMethod,
+      paymentStatus: "pending",
     })
     const row = await ctx.db.get("sales", id)
     if (!row) {
@@ -245,7 +257,8 @@ export const accept = mutation({
       throw new ConvexError("HAS_ACTIVE_SALE")
     }
 
-    const riderName = user.name.trim() || rider.name || user.email
+    // The owner edits the rider name in the panel, so prefer that profile name.
+    const riderName = rider.name?.trim() || user.name.trim() || user.email
     await ctx.db.patch("sales", sale._id, {
       status: "accepted",
       riderUserId: rider._id,
@@ -327,6 +340,32 @@ export const cancelAsOwner = mutation({
       status: "cancelled",
       open: false,
       cancelledAt: Date.now(),
+    })
+    const row = await ctx.db.get("sales", sale._id)
+    if (!row) {
+      throw new Error("Update did not persist the sale")
+    }
+    return toSaleView(row)
+  },
+})
+
+export const setPaidAsOwner = mutation({
+  args: {
+    slug: v.string(),
+    saleId: v.id("sales"),
+    paid: v.boolean(),
+  },
+  returns: saleView,
+  handler: async (ctx, args) => {
+    const business = await requireManagedBusiness(ctx, args.slug)
+    const sale = await ctx.db.get("sales", args.saleId)
+    if (!sale || sale.businessId !== business._id) {
+      throw new ConvexError("NOT_FOUND")
+    }
+
+    await ctx.db.patch("sales", sale._id, {
+      paymentStatus: args.paid ? "paid" : "pending",
+      paidAt: args.paid ? Date.now() : undefined,
     })
     const row = await ctx.db.get("sales", sale._id)
     if (!row) {

@@ -4,6 +4,7 @@ import { z } from "zod"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
 import { fieldErrorsFromZod } from "./businesses"
+import { withCursorFallback } from "./pagination"
 
 export const productFormSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio").max(120),
@@ -78,10 +79,12 @@ export async function listManagedProducts(
   token: string,
   cursor: string | null
 ) {
-  return await getConvexClient(token).query(api.products.listManaged, {
-    slug,
-    paginationOpts: { numItems: PRODUCT_PAGE_SIZE, cursor },
-  })
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.products.listManaged, {
+      slug,
+      paginationOpts: { numItems: PRODUCT_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function getManagedProduct(

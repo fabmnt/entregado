@@ -1,7 +1,11 @@
 import { ConvexError } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
-import { requireSignedInUser, type SignedInUser } from "./identity"
+import {
+  requireSignedInUser,
+  isActiveProfile,
+  type SignedInUser,
+} from "./identity"
 
 export function canManageBusiness(
   user: SignedInUser,
@@ -64,6 +68,10 @@ export async function requireRider(ctx: QueryCtx | MutationCtx): Promise<{
     rider.businessId !== user.businessId
   ) {
     throw new ConvexError("FORBIDDEN")
+  }
+
+  if (!isActiveProfile(rider)) {
+    throw new ConvexError("RIDER_INACTIVE")
   }
 
   const business = await ctx.db.get("businesses", user.businessId)

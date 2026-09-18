@@ -1,13 +1,17 @@
 ---
 import type { Id } from "@entregado/backend"
 import { formatCordoba } from "@entregado/utils"
+import { buttonVariants } from "@workspace/ui/components/button"
 import Layout from "../../../layouts/main.astro"
 import { getStorefront } from "../../../lib/businesses"
 import {
   fulfillmentLabel,
   getPublicSale,
-  saleStatusLabel,
+  paymentMethodLabel,
+  paymentStatusLabel,
 } from "../../../lib/sales"
+import { buildOrderTracking } from "../../../lib/tracking"
+import { orderInquiryUrl } from "../../../lib/whatsapp"
 
 export const prerender = false
 
@@ -24,22 +28,84 @@ const sale = await getPublicSale(slug, saleIdParam as Id<"sales">)
 if (!store || !sale) {
   return Astro.rewrite("/404")
 }
+
+const tracking = buildOrderTracking(sale)
+const endpoint = `/api/sales/${sale.id}?slug=${encodeURIComponent(slug)}`
 ---
 
 <Layout title={`Pedido | ${store.business.name}`}>
   <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
-    <header class="flex flex-col gap-2">
-      <a
-        href={`/${slug}`}
-        class="text-sm text-muted-foreground underline-offset-4 hover:underline"
-      >
-        {store.business.name}
-      </a>
-      <h1 class="text-xl font-medium">Pedido recibido</h1>
-      <p class="text-sm text-muted-foreground">
-        El negocio ya tiene tu pedido. No hace falta crear una cuenta.
-      </p>
-    </header>
+    <a
+      href={`/${slug}`}
+      class="text-sm text-muted-foreground underline-offset-4 hover:underline"
+    >
+      {store.business.name}
+    </a>
+
+    <div
+      id="order-tracking"
+      data-endpoint={endpoint}
+      data-status={tracking.status}
+      data-terminal={tracking.terminal ? "true" : "false"}
+      class="flex flex-col gap-6"
+    >
+      <header class="flex flex-col gap-2">
+        <h1 id="tracking-headline" class="text-xl font-medium">
+          {tracking.headline}
+        </h1>
+        <p
+          id="tracking-rider"
+          class="text-sm text-muted-foreground"
+          hidden={tracking.riderName === null}
+        >
+          {tracking.riderName ? `Repartidor: ${tracking.riderName}` : ""}
+        </p>
+        <p class="text-sm text-muted-foreground">
+          El negocio ya tiene tu pedido. No hace falta crear una cuenta.
+        </p>
+        <p
+          id="tracking-note"
+          class="text-sm text-muted-foreground"
+          hidden={tracking.terminal}
+        >
+          Esta página se actualiza sola; no hace falta recargar.
+        </p>
+        <p
+          id="tracking-cancel"
+          class="text-sm text-destructive"
+          hidden={tracking.status !== "cancelled"}
+        >
+          {
+            tracking.cancelledAt
+              ? `Cancelado el ${tracking.cancelledAt}`
+              : "Cancelado"
+          }
+        </p>
+      </header>
+
+      <ol class="flex flex-col gap-4">
+        {
+          tracking.steps.map((step) => (
+            <li
+              data-step-key={step.key}
+              data-state={step.state}
+              class="group flex flex-col gap-0.5 border-l-2 border-border pl-3 data-[state=current]:border-foreground data-[state=done]:border-foreground"
+            >
+              <span class="text-sm text-muted-foreground group-data-[state=current]:text-foreground group-data-[state=done]:font-medium group-data-[state=done]:text-foreground">
+                {step.label}
+              </span>
+              <span
+                class="text-xs text-muted-foreground"
+                data-step-time
+                hidden={step.time === null}
+              >
+                {step.time ?? ""}
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
 
     <dl class="flex flex-col gap-3 text-sm">
       <div class="flex flex-col gap-0.5">
@@ -55,8 +121,11 @@ if (!store || !sale) {
         <dd>{fulfillmentLabel(sale.fulfillment)}</dd>
       </div>
       <div class="flex flex-col gap-0.5">
-        <dt class="text-muted-foreground">Estado</dt>
-        <dd>{saleStatusLabel(sale.status)}</dd>
+        <dt class="text-muted-foreground">Pago</dt>
+        <dd>
+          {paymentMethodLabel(sale.paymentMethod)} ·{" "}
+          {paymentStatusLabel(sale.paymentStatus)}
+        </dd>
       </div>
       <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Nombre</dt>
@@ -67,5 +136,97 @@ if (!store || !sale) {
         <dd>{sale.buyerPhone}</dd>
       </div>
     </dl>
+
+    {
+      store.business.whatsapp ? (
+        <a
+          class={buttonVariants({ variant: "outline" })}
+          href={orderInquiryUrl(store.business.whatsapp, sale)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Consultar por WhatsApp
+        </a>
+      ) : null
+    }
   </main>
 </Layout>
+
+<script>
+  import type { OrderTracking } from "../../../lib/tracking"
+
+  const POLL_INTERVAL_MS = 12000
+
+  function applyTracking(element: HTMLElement, tracking: OrderTracking) {
+    element.dataset.status = tracking.status
+    element.dataset.terminal = tracking.terminal ? "true" : "false"
+
+    const headline = element.querySelector("#tracking-headline")
+    if (headline) {
+      headline.textContent = tracking.headline
+    }
+
+    const rider = element.querySelector<HTMLElement>("#tracking-rider")
+    if (rider) {
+      rider.hidden = tracking.riderName === null
+      rider.textContent = tracking.riderName
+        ? `Repartidor: ${tracking.riderName}`
+        : ""
+    }
+
+    const note = element.querySelector<HTMLElement>("#tracking-note")
+    if (note) {
+      note.hidden = tracking.terminal
+    }
+
+    const cancel = element.querySelector<HTMLElement>("#tracking-cancel")
+    if (cancel) {
+      cancel.hidden = tracking.status !== "cancelled"
+      cancel.textContent = tracking.cancelledAt
+        ? `Cancelado el ${tracking.cancelledAt}`
+        : "Cancelado"
+    }
+
+    for (const step of tracking.steps) {
+      const item = element.querySelector<HTMLElement>(
+        `[data-step-key="${step.key}"]`
+      )
+      if (!item) {
+        continue
+      }
+      item.dataset.state = step.state
+      const time = item.querySelector<HTMLElement>("[data-step-time]")
+      if (time) {
+        time.hidden = step.time === null
+        time.textContent = step.time ?? ""
+      }
+    }
+  }
+
+  const root = document.getElementById("order-tracking")
+  const endpoint = root?.dataset.endpoint
+
+  if (root && endpoint && root.dataset.terminal !== "true") {
+    let timer: number | undefined
+
+    const poll = async () => {
+      try {
+        const response = await fetch(endpoint, {
+          headers: { accept: "application/json" },
+        })
+        if (!response.ok) {
+          return
+        }
+        const tracking = (await response.json()) as OrderTracking
+        applyTracking(root, tracking)
+        if (tracking.terminal) {
+          window.clearInterval(timer)
+        }
+      } catch {
+        // Transient network errors are ignored; the next tick retries.
+      }
+    }
+
+    timer = window.setInterval(poll, POLL_INTERVAL_MS)
+  }
+</script>

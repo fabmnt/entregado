@@ -3,10 +3,25 @@ import { api, getConvexClient } from "./convex"
 
 const DIRECTORY_PAGE_SIZE = 12
 
+// Convex rejects cursors that do not belong to this query, so a stale or
+// hand-edited link falls back to the first page instead of failing.
+function isInvalidCursorError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("InvalidCursor")
+}
+
 export async function listBusinesses(cursor: string | null) {
-  return await getConvexClient().query(api.businesses.list, {
-    paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor },
-  })
+  try {
+    return await getConvexClient().query(api.businesses.list, {
+      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor },
+    })
+  } catch (error) {
+    if (cursor === null || !isInvalidCursorError(error)) {
+      throw error
+    }
+    return await getConvexClient().query(api.businesses.list, {
+      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor: null },
+    })
+  }
 }
 
 export async function getBusinessBySlug(

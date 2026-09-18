@@ -11,6 +11,7 @@ import { parseNicaraguaPhone } from "@entregado/utils"
 import { z } from "zod"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const SLUG_MAX_LENGTH = 48
 const DIRECTORY_TEXT_MAX_LENGTH = 500
@@ -131,9 +132,11 @@ export async function listManagedBusinesses(
   token: string,
   cursor: string | null
 ) {
-  return await getConvexClient(token).query(api.businesses.listForSignedIn, {
-    paginationOpts: { numItems: BUSINESS_PAGE_SIZE, cursor },
-  })
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.businesses.listForSignedIn, {
+      paginationOpts: { numItems: BUSINESS_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function getManagedBusiness(
