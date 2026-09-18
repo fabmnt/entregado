@@ -143,13 +143,13 @@ export const setActive = mutation({
       // A deactivated rider is redirected away from the board, so an accepted
       // delivery would sit unfinished forever. Hand it back to the board.
       const assigned = await ctx.db
-        .query("sales")
+        .query("orders")
         .withIndex("by_riderUserId_and_status", (q) =>
           q.eq("riderUserId", rider._id).eq("status", "accepted")
         )
         .collect()
-      for (const sale of assigned) {
-        await ctx.db.patch("sales", sale._id, {
+      for (const order of assigned) {
+        await ctx.db.patch("orders", order._id, {
           status: "pending",
           riderUserId: undefined,
           riderName: undefined,

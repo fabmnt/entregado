@@ -1,11 +1,11 @@
-import type { SaleView } from "@entregado/types"
+import type { OrderView } from "@entregado/types"
 import { formatCordoba, whatsappMeUrl } from "@entregado/utils"
-import { saleStatusLabel } from "./sales"
+import { orderItemLines, orderStatusLabel } from "./orders"
 
 export type RiderNoticeStage = "on_the_way" | "arriving"
 
-function saleDetails(sale: SaleView): string {
-  return `${sale.quantity} × ${sale.productName} (${formatCordoba(sale.totalPrice)})`
+function orderDetails(order: OrderView): string {
+  return `${orderItemLines(order).join(", ")} (${formatCordoba(order.totalPrice)})`
 }
 
 export function businessInquiryUrl(
@@ -18,37 +18,37 @@ export function businessInquiryUrl(
   )
 }
 
-export function orderInquiryUrl(whatsapp: string, sale: SaleView): string {
+export function orderInquiryUrl(whatsapp: string, order: OrderView): string {
   return whatsappMeUrl(
     whatsapp,
-    `Hola, quiero consultar por mi pedido ${sale.id} (${saleStatusLabel(sale.status)}).`
+    `Hola, quiero consultar por mi pedido ${order.id} (${orderStatusLabel(order.status)}).`
   )
 }
 
-function buyerNoticeMessage(sale: SaleView): string {
-  const details = saleDetails(sale)
-  if (sale.status === "pending") {
-    return sale.fulfillment === "pickup"
-      ? `Hola ${sale.buyerName}, recibimos tu pedido de ${details}. Te avisamos cuando esté listo para retirar.`
-      : `Hola ${sale.buyerName}, recibimos tu pedido de ${details}. Te avisamos cuando salga a entrega.`
+function buyerNoticeMessage(order: OrderView): string {
+  const details = orderDetails(order)
+  if (order.status === "pending") {
+    return order.fulfillment === "pickup"
+      ? `Hola ${order.buyerName}, recibimos tu pedido de ${details}. Te avisamos cuando esté listo para retirar.`
+      : `Hola ${order.buyerName}, recibimos tu pedido de ${details}. Te avisamos cuando salga a entrega.`
   }
-  return sale.fulfillment === "pickup"
-    ? `Hola ${sale.buyerName}, tu pedido de ${details} está listo para retirar.`
-    : `Hola ${sale.buyerName}, tu pedido de ${details} va en camino.`
+  return order.fulfillment === "pickup"
+    ? `Hola ${order.buyerName}, tu pedido de ${details} está listo para retirar.`
+    : `Hola ${order.buyerName}, tu pedido de ${details} va en camino.`
 }
 
-export function buyerNoticeUrl(sale: SaleView): string {
-  return whatsappMeUrl(sale.buyerPhone, buyerNoticeMessage(sale))
+export function buyerNoticeUrl(order: OrderView): string {
+  return whatsappMeUrl(order.buyerPhone, buyerNoticeMessage(order))
 }
 
 export function riderNoticeUrl(
-  sale: SaleView,
+  order: OrderView,
   stage: RiderNoticeStage
 ): string {
-  const details = saleDetails(sale)
+  const details = orderDetails(order)
   const message =
     stage === "on_the_way"
-      ? `Hola ${sale.buyerName}, voy en camino con tu pedido de ${details}.`
-      : `Hola ${sale.buyerName}, ya estoy llegando con tu pedido de ${details}.`
-  return whatsappMeUrl(sale.buyerPhone, message)
+      ? `Hola ${order.buyerName}, voy en camino con tu pedido de ${details}.`
+      : `Hola ${order.buyerName}, ya estoy llegando con tu pedido de ${details}.`
+  return whatsappMeUrl(order.buyerPhone, message)
 }

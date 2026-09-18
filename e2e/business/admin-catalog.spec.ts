@@ -21,6 +21,6 @@ test.describe("owner catalog", () => {
       page.getByRole("heading", { name: business.name })
     ).toBeVisible()
     await expect(page.getByText(product.name)).toBeVisible()
-    await expect(page.getByRole("link", { name: "Comprar" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Agregar" })).toBeVisible()
   })
 })

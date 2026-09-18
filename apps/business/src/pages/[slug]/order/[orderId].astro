@@ -6,31 +6,31 @@ import Layout from "../../../layouts/main.astro"
 import { getStorefront } from "../../../lib/businesses"
 import {
   fulfillmentLabel,
-  getPublicSale,
+  getPublicOrder,
   paymentMethodLabel,
   paymentStatusLabel,
-} from "../../../lib/sales"
+} from "../../../lib/orders"
 import { buildOrderTracking } from "../../../lib/tracking"
 import { orderInquiryUrl } from "../../../lib/whatsapp"
 
 export const prerender = false
 
 const slug = Astro.params.slug
-const saleIdParam = Astro.params.saleId
+const orderIdParam = Astro.params.orderId
 
-if (!slug || !saleIdParam) {
+if (!slug || !orderIdParam) {
   return Astro.rewrite("/404")
 }
 
 const store = await getStorefront(slug)
-const sale = await getPublicSale(slug, saleIdParam as Id<"sales">)
+const order = await getPublicOrder(slug, orderIdParam as Id<"orders">)
 
-if (!store || !sale) {
+if (!store || !order) {
   return Astro.rewrite("/404")
 }
 
-const tracking = buildOrderTracking(sale)
-const endpoint = `/api/sales/${sale.id}?slug=${encodeURIComponent(slug)}`
+const tracking = buildOrderTracking(order)
+const endpoint = `/api/orders/${order.id}?slug=${encodeURIComponent(slug)}`
 ---
 
 <Layout title={`Pedido | ${store.business.name}`}>
@@ -108,32 +108,47 @@ const endpoint = `/api/sales/${sale.id}?slug=${encodeURIComponent(slug)}`
     </div>
 
     <dl class="flex flex-col gap-3 text-sm">
-      <div class="flex flex-col gap-0.5">
-        <dt class="text-muted-foreground">Producto</dt>
+      <div class="flex flex-col gap-1">
+        <dt class="text-muted-foreground">Productos</dt>
         <dd>
-          {sale.quantity} × {sale.productName} · {
-            formatCordoba(sale.totalPrice)
-          }
+          <ul class="flex flex-col gap-1">
+            {
+              order.items.map((item) => (
+                <li class="flex justify-between gap-4">
+                  <span>
+                    {item.quantity} × {item.productName}
+                  </span>
+                  <span class="text-muted-foreground">
+                    {formatCordoba(item.unitPrice)} c/u
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
         </dd>
       </div>
       <div class="flex flex-col gap-0.5">
+        <dt class="text-muted-foreground">Total</dt>
+        <dd class="font-medium">{formatCordoba(order.totalPrice)}</dd>
+      </div>
+      <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Entrega</dt>
-        <dd>{fulfillmentLabel(sale.fulfillment)}</dd>
+        <dd>{fulfillmentLabel(order.fulfillment)}</dd>
       </div>
       <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Pago</dt>
         <dd>
-          {paymentMethodLabel(sale.paymentMethod)} ·{" "}
-          {paymentStatusLabel(sale.paymentStatus)}
+          {paymentMethodLabel(order.paymentMethod)} ·{" "}
+          {paymentStatusLabel(order.paymentStatus)}
         </dd>
       </div>
       <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Nombre</dt>
-        <dd>{sale.buyerName}</dd>
+        <dd>{order.buyerName}</dd>
       </div>
       <div class="flex flex-col gap-0.5">
         <dt class="text-muted-foreground">Teléfono</dt>
-        <dd>{sale.buyerPhone}</dd>
+        <dd>{order.buyerPhone}</dd>
       </div>
     </dl>
 
@@ -141,7 +156,7 @@ const endpoint = `/api/sales/${sale.id}?slug=${encodeURIComponent(slug)}`
       store.business.whatsapp ? (
         <a
           class={buttonVariants({ variant: "outline" })}
-          href={orderInquiryUrl(store.business.whatsapp, sale)}
+          href={orderInquiryUrl(store.business.whatsapp, order)}
           target="_blank"
           rel="noopener noreferrer"
         >

@@ -72,32 +72,44 @@ export type CreateDirectoryBusinessInput = {
   whatsapp: string
 }
 
-export const SALE_STATUSES = [
+export const ORDER_STATUSES = [
   "pending",
   "accepted",
   "completed",
   "cancelled",
 ] as const
-export type SaleStatus = (typeof SALE_STATUSES)[number]
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
 export const FULFILLMENT_MODES = ["delivery", "pickup"] as const
 export type FulfillmentMode = (typeof FULFILLMENT_MODES)[number]
 
-export type SaleView = {
+export type OrderItemView = {
   id: string
+  productId: string
   productName: string
-  quantity: number
   unitPrice: number
+  quantity: number
+}
+
+export type OrderView = {
+  id: string
+  items: OrderItemView[]
+  itemCount: number
   totalPrice: number
   buyerName: string
   buyerPhone: string
   buyerLocation: string | null
   fulfillment: FulfillmentMode
-  status: SaleStatus
+  status: OrderStatus
   paymentMethod: PaymentMethod | null
   paymentStatus: PaymentStatus
   riderName: string | null
   createdAt: string
+}
+
+export type PublicOrderView = OrderView & {
+  completedAt: number | null
+  cancelledAt: number | null
 }
 
 export type RiderView = {
@@ -107,7 +119,8 @@ export type RiderView = {
   active: boolean
 }
 
-export const MAX_SALE_QUANTITY = 99
+export const MAX_ITEM_QUANTITY = 99
+export const MAX_ORDER_ITEMS = 50
 
 export const PAYMENT_METHODS = ["cash_on_delivery", "transfer"] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]

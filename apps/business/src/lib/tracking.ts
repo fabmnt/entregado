@@ -1,5 +1,5 @@
-import type { FulfillmentMode, SaleStatus } from "@entregado/types"
-import type { getPublicSale } from "./sales"
+import type { FulfillmentMode, OrderStatus } from "@entregado/types"
+import type { getPublicOrder } from "./orders"
 
 const NICARAGUA_TIME_ZONE = "America/Managua"
 
@@ -12,7 +12,9 @@ const dateTimeFormatter = new Intl.DateTimeFormat("es-NI", {
   timeZone: NICARAGUA_TIME_ZONE,
 })
 
-export type PublicSale = NonNullable<Awaited<ReturnType<typeof getPublicSale>>>
+export type PublicOrder = NonNullable<
+  Awaited<ReturnType<typeof getPublicOrder>>
+>
 
 export type TrackingStepKey = "received" | "inProgress" | "finish"
 export type TrackingStepState = "done" | "current" | "pending"
@@ -25,7 +27,7 @@ export type TrackingStep = {
 }
 
 export type OrderTracking = {
-  status: SaleStatus
+  status: OrderStatus
   headline: string
   terminal: boolean
   riderName: string | null
@@ -49,7 +51,7 @@ function finishLabel(fulfillment: FulfillmentMode): string {
 }
 
 function headlineLabel(
-  status: SaleStatus,
+  status: OrderStatus,
   fulfillment: FulfillmentMode
 ): string {
   if (status === "pending") {
@@ -73,27 +75,27 @@ function stepState(done: boolean, current: boolean): TrackingStepState {
   return current ? "current" : "pending"
 }
 
-export function buildOrderTracking(sale: PublicSale): OrderTracking {
-  const { fulfillment, status } = sale
+export function buildOrderTracking(order: PublicOrder): OrderTracking {
+  const { fulfillment, status } = order
   const terminal = status === "completed" || status === "cancelled"
 
   const advanced = status === "accepted" || status === "completed"
   // A delivery cancelled after a rider took it still passed the middle step.
   const inProgressDone =
-    advanced || (status === "cancelled" && sale.riderName !== null)
+    advanced || (status === "cancelled" && order.riderName !== null)
 
   return {
     status,
     headline: headlineLabel(status, fulfillment),
     terminal,
-    riderName: sale.riderName,
-    cancelledAt: formatTime(sale.cancelledAt),
+    riderName: order.riderName,
+    cancelledAt: formatTime(order.cancelledAt),
     steps: [
       {
         key: "received",
         label: "Recibido",
         state: "done",
-        time: formatTime(sale.createdAt),
+        time: formatTime(order.createdAt),
       },
       {
         key: "inProgress",
@@ -106,7 +108,7 @@ export function buildOrderTracking(sale: PublicSale): OrderTracking {
         key: "finish",
         label: finishLabel(fulfillment),
         state: stepState(status === "completed", status === "accepted"),
-        time: formatTime(sale.completedAt),
+        time: formatTime(order.completedAt),
       },
     ],
   }

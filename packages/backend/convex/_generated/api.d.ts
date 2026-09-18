@@ -14,10 +14,10 @@ import type * as businesses from "../businesses.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as identity from "../identity.js";
+import type * as orders from "../orders.js";
 import type * as phone from "../phone.js";
 import type * as products from "../products.js";
 import type * as riders from "../riders.js";
-import type * as sales from "../sales.js";
 
 import type {
   ApiFromModules,
@@ -32,10 +32,10 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   http: typeof http;
   identity: typeof identity;
+  orders: typeof orders;
   phone: typeof phone;
   products: typeof products;
   riders: typeof riders;
-  sales: typeof sales;
 }>;
 
 /**

@@ -1,7 +1,9 @@
 ---
+import { buttonVariants } from "@workspace/ui/components/button"
 import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import Layout from "../layouts/main.astro"
 import { getStorefront } from "../lib/businesses"
+import { addCartItem, cartUnitCount, readCart, writeCart } from "../lib/cart"
 import { businessInquiryUrl } from "../lib/whatsapp"
 
 export const prerender = false
@@ -19,6 +21,23 @@ if (!store) {
 
 const { business, products } = store
 const whatsapp = business.whatsapp
+const cart = readCart(Astro.cookies, slug)
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const productId = String(form.get("productId") ?? "")
+
+  if (
+    String(form.get("intent") ?? "") === "add" &&
+    products.some((product) => product.id === productId)
+  ) {
+    writeCart(Astro.cookies, slug, addCartItem(cart, productId))
+  }
+
+  return Astro.redirect(`/${business.slug}`, 303)
+}
+
+const cartCount = cartUnitCount(cart)
 ---
 
 <Layout title={business.name} description={business.description}>
@@ -39,6 +58,16 @@ const whatsapp = business.whatsapp
           {business.kind === "pharmacy" ? "Farmacia" : "Comida"}
         </p>
       </div>
+      {
+        cartCount > 0 ? (
+          <a
+            href={`/${business.slug}/cart`}
+            class="text-sm font-medium underline-offset-4 hover:underline"
+          >
+            Ver pedido · {cartCount}
+          </a>
+        ) : null
+      }
       <p class="text-sm leading-relaxed">{business.description}</p>
       {
         business.productPitch ? (
@@ -120,12 +149,17 @@ const whatsapp = business.whatsapp
                     {product.description}
                   </p>
                   <p class="text-sm">{formatCordoba(product.price)}</p>
-                  <a
-                    href={`/${business.slug}/buy/${product.id}`}
-                    class="mt-2 text-sm font-medium underline-offset-4 hover:underline"
-                  >
-                    Comprar
-                  </a>
+                  <form method="post" class="mt-2">
+                    <input type="hidden" name="productId" value={product.id} />
+                    <button
+                      class={buttonVariants({ size: "sm" })}
+                      type="submit"
+                      name="intent"
+                      value="add"
+                    >
+                      Agregar
+                    </button>
+                  </form>
                 </div>
               </li>
             ))}
