@@ -11,6 +11,7 @@ export type SignedInUser = {
   kind: UserKind
   profileId: string | null
   businessId: string | null
+  active: boolean
 }
 
 export const RESERVED_BUSINESS_SLUGS = [
@@ -20,6 +21,7 @@ export const RESERVED_BUSINESS_SLUGS = [
   "admin",
   "api",
   "rider",
+  "inactive",
 ] as const
 
 export type DirectoryBusiness = {
@@ -92,6 +94,8 @@ export type SaleView = {
   buyerLocation: string | null
   fulfillment: FulfillmentMode
   status: SaleStatus
+  paymentMethod: PaymentMethod | null
+  paymentStatus: PaymentStatus
   riderName: string | null
   createdAt: string
 }
@@ -100,12 +104,16 @@ export type RiderView = {
   id: string
   name: string
   email: string
+  active: boolean
 }
 
 export const MAX_SALE_QUANTITY = 99
 
 export const PAYMENT_METHODS = ["cash_on_delivery", "transfer"] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+export const PAYMENT_STATUSES = ["pending", "paid"] as const
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 export const COUNTRY_ISO = "NI"
 export const PHONE_COUNTRY_CODE = "505"

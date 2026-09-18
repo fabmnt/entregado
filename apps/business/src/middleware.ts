@@ -1,3 +1,4 @@
+import type { SignedInUser } from "@entregado/types"
 import { defineMiddleware } from "astro:middleware"
 import { getConvexAccessToken } from "./lib/auth-server"
 import { api, getConvexClient } from "./lib/convex"
@@ -10,6 +11,10 @@ function isRiderPath(pathname: string): boolean {
   return pathname === "/rider" || pathname.startsWith("/rider/")
 }
 
+function isInactivePath(pathname: string): boolean {
+  return pathname === "/inactive"
+}
+
 function isAuthPage(pathname: string): boolean {
   return pathname === "/login" || pathname === "/register"
 }
@@ -18,9 +23,17 @@ function needsSession(pathname: string): boolean {
   return (
     isAdminPath(pathname) ||
     isRiderPath(pathname) ||
+    isInactivePath(pathname) ||
     isAuthPage(pathname) ||
     pathname === "/"
   )
+}
+
+function homePath(user: SignedInUser): string {
+  if (user.kind !== "rider") {
+    return "/admin"
+  }
+  return user.active ? "/rider" : "/inactive"
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
@@ -50,20 +63,28 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect("/login")
   }
 
-  if (isRiderPath(pathname) && !user) {
+  if ((isRiderPath(pathname) || isInactivePath(pathname)) && !user) {
     return context.redirect("/login")
   }
 
   if (user?.kind === "rider" && (isAdminPath(pathname) || pathname === "/")) {
-    return context.redirect("/rider")
+    return context.redirect(homePath(user))
   }
 
-  if (user && user.kind !== "rider" && isRiderPath(pathname)) {
-    return context.redirect("/admin")
+  if (user && (isRiderPath(pathname) || isInactivePath(pathname))) {
+    if (user.kind !== "rider") {
+      return context.redirect("/admin")
+    }
+    if (isInactivePath(pathname)) {
+      return user.active ? context.redirect("/rider") : next()
+    }
+    if (!user.active) {
+      return context.redirect("/inactive")
+    }
   }
 
   if (isAuthPage(pathname) && user) {
-    return context.redirect(user.kind === "rider" ? "/rider" : "/admin")
+    return context.redirect(homePath(user))
   }
 
   return next()

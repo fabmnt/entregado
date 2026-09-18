@@ -1,6 +1,9 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
-import type { Doc, Id } from "./_generated/dataModel"
-import type { QueryCtx } from "./_generated/server"
+import type { Doc } from "./_generated/dataModel"
 import { mutation, query } from "./_generated/server"
 import {
   isBusinessSuspended,
@@ -10,9 +13,15 @@ import {
 } from "./access"
 import { parseNicaraguaE164 } from "./phone"
 import { productSupportsDelivery } from "./products"
-import { fulfillmentMode, saleView } from "./schema"
+import {
+  fulfillmentMode,
+  paymentMethod,
+  publicSaleView,
+  saleView,
+} from "./schema"
 
 const SALE_LIST_LIMIT = 100
+const RECENT_SALE_LIMIT = 10
 const MAX_QUANTITY = 99
 const BUYER_NAME_MAX = 80
 const BUYER_LOCATION_MAX = 500
@@ -29,6 +38,8 @@ function toSaleView(doc: Doc<"sales">) {
     buyerLocation: doc.buyerLocation ?? null,
     fulfillment: doc.fulfillment,
     status: doc.status,
+    paymentMethod: doc.paymentMethod ?? null,
+    paymentStatus: doc.paymentStatus ?? "pending",
     riderName: doc.riderName ?? null,
     createdAt: new Date(doc._creationTime).toISOString(),
   }
@@ -68,36 +79,20 @@ function toPublicSaleView(doc: Doc<"sales">) {
     ...view,
     buyerPhone: maskBuyerPhone(view.buyerPhone),
     buyerLocation: null,
+    completedAt: doc.completedAt ?? null,
+    cancelledAt: doc.cancelledAt ?? null,
   }
-}
-
-async function listByFulfillmentAndStatus(
-  ctx: QueryCtx,
-  businessId: Id<"businesses">,
-  fulfillment: Doc<"sales">["fulfillment"],
-  status: Doc<"sales">["status"]
-) {
-  return await ctx.db
-    .query("sales")
-    .withIndex("by_businessId_and_fulfillment_and_status", (q) =>
-      q
-        .eq("businessId", businessId)
-        .eq("fulfillment", fulfillment)
-        .eq("status", status)
-    )
-    .order("desc")
-    .take(SALE_LIST_LIMIT)
 }
 
 export const getPublic = query({
   args: { slug: v.string(), saleId: v.id("sales") },
-  returns: v.union(saleView, v.null()),
+  returns: v.union(publicSaleView, v.null()),
   handler: async (ctx, args) => {
     const business = await ctx.db
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    if (!business) {
+    if (!business || isBusinessSuspended(business)) {
       return null
     }
 
@@ -110,38 +105,31 @@ export const getPublic = query({
 })
 
 export const listManaged = query({
-  args: { slug: v.string() },
+  args: { slug: v.string(), paginationOpts: paginationOptsValidator },
   returns: v.object({
-    open: v.array(saleView),
+    open: paginationResultValidator(saleView),
     recent: v.array(saleView),
   }),
   handler: async (ctx, args) => {
     const business = await requireManagedBusiness(ctx, args.slug)
-    const openRows = (
-      await Promise.all([
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "pending"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "pending"),
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "accepted"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "accepted"),
-      ])
-    )
-      .flat()
-      .sort((a, b) => b._creationTime - a._creationTime)
+    const openResult = await ctx.db
+      .query("sales")
+      .withIndex("by_businessId_and_open", (q) =>
+        q.eq("businessId", business._id).eq("open", true)
+      )
+      .order("desc")
+      .paginate(args.paginationOpts)
 
-    const recentRows = (
-      await Promise.all([
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "completed"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "completed"),
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "cancelled"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "cancelled"),
-      ])
-    )
-      .flat()
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, SALE_LIST_LIMIT)
+    const recentRows = await ctx.db
+      .query("sales")
+      .withIndex("by_businessId_and_open", (q) =>
+        q.eq("businessId", business._id).eq("open", false)
+      )
+      .order("desc")
+      .take(RECENT_SALE_LIMIT)
 
     return {
-      open: openRows.map(toSaleView),
+      open: { ...openResult, page: openResult.page.map(toSaleView) },
       recent: recentRows.map(toSaleView),
     }
   },
@@ -194,6 +182,7 @@ export const create = mutation({
     buyerPhone: v.string(),
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
+    paymentMethod: paymentMethod,
   },
   returns: saleView,
   handler: async (ctx, args) => {
@@ -237,6 +226,9 @@ export const create = mutation({
       ...(wantsDelivery && buyerLocation ? { buyerLocation } : {}),
       fulfillment: wantsDelivery ? "delivery" : "pickup",
       status: "pending",
+      open: true,
+      paymentMethod: args.paymentMethod,
+      paymentStatus: "pending",
     })
     const row = await ctx.db.get("sales", id)
     if (!row) {
@@ -269,7 +261,8 @@ export const accept = mutation({
       throw new ConvexError("HAS_ACTIVE_SALE")
     }
 
-    const riderName = user.name.trim() || rider.name || user.email
+    // The owner edits the rider name in the panel, so prefer that profile name.
+    const riderName = rider.name?.trim() || user.name.trim() || user.email
     await ctx.db.patch("sales", sale._id, {
       status: "accepted",
       riderUserId: rider._id,
@@ -298,6 +291,7 @@ export const completeAsRider = mutation({
 
     await ctx.db.patch("sales", sale._id, {
       status: "completed",
+      open: false,
       completedAt: Date.now(),
     })
     const row = await ctx.db.get("sales", sale._id)
@@ -324,6 +318,7 @@ export const completeAsOwner = mutation({
 
     await ctx.db.patch("sales", sale._id, {
       status: "completed",
+      open: false,
       completedAt: Date.now(),
     })
     const row = await ctx.db.get("sales", sale._id)
@@ -347,7 +342,34 @@ export const cancelAsOwner = mutation({
 
     await ctx.db.patch("sales", sale._id, {
       status: "cancelled",
+      open: false,
       cancelledAt: Date.now(),
+    })
+    const row = await ctx.db.get("sales", sale._id)
+    if (!row) {
+      throw new Error("Update did not persist the sale")
+    }
+    return toSaleView(row)
+  },
+})
+
+export const setPaidAsOwner = mutation({
+  args: {
+    slug: v.string(),
+    saleId: v.id("sales"),
+    paid: v.boolean(),
+  },
+  returns: saleView,
+  handler: async (ctx, args) => {
+    const business = await requireManagedBusiness(ctx, args.slug)
+    const sale = await ctx.db.get("sales", args.saleId)
+    if (!sale || sale.businessId !== business._id) {
+      throw new ConvexError("NOT_FOUND")
+    }
+
+    await ctx.db.patch("sales", sale._id, {
+      paymentStatus: args.paid ? "paid" : "pending",
+      paidAt: args.paid ? Date.now() : undefined,
     })
     const row = await ctx.db.get("sales", sale._id)
     if (!row) {

@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
@@ -5,8 +9,6 @@ import { mutation, query } from "./_generated/server"
 import { isBusinessSuspended, requireManagedBusiness } from "./access"
 import { deleteStorageIfUnreferenced } from "./files"
 import { storeProduct } from "./schema"
-
-const PRODUCT_LIST_LIMIT = 100
 
 function assertPrice(price: number) {
   if (!Number.isFinite(price) || price < 0) {
@@ -36,17 +38,22 @@ export async function toStoreProduct(
 }
 
 export const listManaged = query({
-  args: { slug: v.string() },
-  returns: v.array(storeProduct),
+  args: { slug: v.string(), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(storeProduct),
   handler: async (ctx, args) => {
     const business = await requireManagedBusiness(ctx, args.slug)
-    const rows = await ctx.db
+    const result = await ctx.db
       .query("products")
       .withIndex("by_businessId", (q) => q.eq("businessId", business._id))
       .order("desc")
-      .take(PRODUCT_LIST_LIMIT)
+      .paginate(args.paginationOpts)
 
-    return await Promise.all(rows.map((row) => toStoreProduct(ctx, row)))
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toStoreProduct(ctx, row))
+      ),
+    }
   },
 })
 

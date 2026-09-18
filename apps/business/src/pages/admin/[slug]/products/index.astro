@@ -11,6 +11,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { formatCordoba } from "@entregado/utils"
 import AdminNav from "../../../../components/admin-nav.astro"
+import PaginationNav from "../../../../components/pagination-nav.astro"
 import Layout from "../../../../layouts/main.astro"
 import {
   fieldErrorsFromZod,
@@ -31,6 +32,7 @@ import {
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!slug || !token) {
   return new Response(null, { status: 404 })
@@ -112,7 +114,7 @@ if (Astro.request.method === "POST") {
   }
 }
 
-const products = await listManagedProducts(slug, token)
+const products = await listManagedProducts(slug, token, cursor)
 ---
 
 <Layout title={`Productos | ${business.name}`}>
@@ -120,11 +122,11 @@ const products = await listManagedProducts(slug, token)
     <AdminNav slug={business.slug} name={business.name} current="products" />
 
     {
-      products.length === 0 ? (
+      products.page.length === 0 ? (
         <p class="text-sm text-muted-foreground">Todavía no hay productos.</p>
       ) : (
         <ul class="flex flex-col gap-3">
-          {products.map((product) => (
+          {products.page.map((product) => (
             <li class="flex items-start justify-between gap-4 border-b border-border pb-3">
               <div class="flex flex-col gap-0.5">
                 <span class="text-sm font-medium">{product.name}</span>
@@ -145,6 +147,13 @@ const products = await listManagedProducts(slug, token)
         </ul>
       )
     }
+
+    <PaginationNav
+      basePath={`/admin/${slug}/products`}
+      cursor={cursor}
+      isDone={products.isDone}
+      continueCursor={products.continueCursor}
+    />
 
     <form
       method="post"

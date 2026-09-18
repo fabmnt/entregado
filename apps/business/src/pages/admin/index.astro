@@ -13,6 +13,7 @@ import {
   NativeSelectOption,
 } from "@workspace/ui/components/native-select"
 import { Textarea } from "@workspace/ui/components/textarea"
+import PaginationNav from "../../components/pagination-nav.astro"
 import Layout from "../../layouts/main.astro"
 import {
   createBusiness,
@@ -61,6 +62,7 @@ let formError = ""
 
 const token = Astro.locals.convexToken
 const user = Astro.locals.user
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!token || !user) {
   return Astro.redirect("/login", 303)
@@ -122,7 +124,7 @@ if (Astro.request.method === "POST") {
   }
 }
 
-const listed = await listManagedBusinesses(token)
+const listed = await listManagedBusinesses(token, cursor)
 const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
 ---
 
@@ -158,11 +160,11 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
     </header>
 
     {
-      listed.length === 0 ? (
+      listed.page.length === 0 ? (
         <p class="text-sm text-muted-foreground">Todavía no hay negocios.</p>
       ) : (
         <ul class="flex flex-col gap-3">
-          {listed.map((business) => (
+          {listed.page.map((business) => (
             <li class="flex flex-col gap-0.5 border-b border-border pb-3">
               <a
                 href={`/admin/${business.slug}`}
@@ -179,6 +181,13 @@ const kindLabel = user.kind === "admin" ? "Admin general" : "Dueño de negocio"
         </ul>
       )
     }
+
+    <PaginationNav
+      basePath="/admin"
+      cursor={cursor}
+      isDone={listed.isDone}
+      continueCursor={listed.continueCursor}
+    />
 
     <form
       method="post"

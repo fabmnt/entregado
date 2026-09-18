@@ -2,7 +2,10 @@ import type { Id } from "@entregado/backend"
 import {
   FULFILLMENT_MODES,
   MAX_SALE_QUANTITY,
+  PAYMENT_METHODS,
   type FulfillmentMode,
+  type PaymentMethod,
+  type PaymentStatus,
   type SaleStatus,
   type SaleView,
 } from "@entregado/types"
@@ -11,6 +14,7 @@ import { z } from "zod"
 import { fieldErrorsFromZod } from "./businesses"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const BUYER_NAME_MAX = 80
 const BUYER_LOCATION_MAX = 500
@@ -41,6 +45,9 @@ export const checkoutSchema = z
     fulfillment: z.enum(FULFILLMENT_MODES, {
       error: "Elige delivery o retiro",
     }),
+    paymentMethod: z.enum(PAYMENT_METHODS, {
+      error: "Elige cómo vas a pagar",
+    }),
     buyerLocation: z
       .string()
       .trim()
@@ -61,7 +68,12 @@ export const checkoutSchema = z
 
 export type CheckoutFieldErrors = Partial<
   Record<
-    "quantity" | "buyerName" | "buyerPhone" | "fulfillment" | "buyerLocation",
+    | "quantity"
+    | "buyerName"
+    | "buyerPhone"
+    | "fulfillment"
+    | "paymentMethod"
+    | "buyerLocation",
     string
   >
 >
@@ -88,6 +100,20 @@ export function saleStatusLabel(status: SaleStatus): string {
 
 export function fulfillmentLabel(fulfillment: FulfillmentMode): string {
   return fulfillment === "delivery" ? "Delivery" : "Retiro"
+}
+
+export function paymentMethodLabel(method: PaymentMethod | null): string {
+  if (method === "cash_on_delivery") {
+    return "Efectivo al entregar"
+  }
+  if (method === "transfer") {
+    return "Transferencia"
+  }
+  return "Sin definir"
+}
+
+export function paymentStatusLabel(status: PaymentStatus): string {
+  return status === "paid" ? "Pagado" : "Sin pagar"
 }
 
 export async function getStoreProduct(slug: string, productId: Id<"products">) {
@@ -138,6 +164,7 @@ export async function createSale(
       buyerName: parsed.data.buyerName,
       buyerPhone: parsed.data.buyerPhone,
       fulfillment: parsed.data.fulfillment,
+      paymentMethod: parsed.data.paymentMethod,
       ...(wantsDelivery ? { buyerLocation: parsed.data.buyerLocation } : {}),
     })
     return { ok: true, sale }
@@ -200,8 +227,19 @@ export async function createSale(
   }
 }
 
-export async function listManagedSales(slug: string, token: string) {
-  return await getConvexClient(token).query(api.sales.listManaged, { slug })
+const OPEN_SALE_PAGE_SIZE = 20
+
+export async function listManagedSales(
+  slug: string,
+  token: string,
+  cursor: string | null
+) {
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.sales.listManaged, {
+      slug,
+      paginationOpts: { numItems: OPEN_SALE_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function completeSaleAsOwner(
@@ -236,6 +274,27 @@ export async function cancelSaleAsOwner(
   }
 }
 
+export async function setSalePaidAsOwner(
+  slug: string,
+  saleId: Id<"sales">,
+  paid: boolean,
+  token: string
+): Promise<SaleActionResult> {
+  try {
+    await getConvexClient(token).mutation(api.sales.setPaidAsOwner, {
+      slug,
+      saleId,
+      paid,
+    })
+    return { ok: true }
+  } catch (error) {
+    return mapOwnerSaleError(
+      error,
+      paid ? "marcar como pagada" : "marcar como pendiente"
+    )
+  }
+}
+
 export async function listRiderSales(token: string) {
   return await getConvexClient(token).query(api.sales.listForRider, {})
 }
@@ -248,6 +307,9 @@ export async function acceptSale(
     await getConvexClient(token).mutation(api.sales.accept, { saleId })
     return { ok: true }
   } catch (error) {
+    if (isConvexErrorCode(error, "RIDER_INACTIVE")) {
+      return { ok: false, error: "Tu cuenta está desactivada" }
+    }
     if (isConvexErrorCode(error, "HAS_ACTIVE_SALE")) {
       return { ok: false, error: "Termina la entrega actual para tomar otra" }
     }
@@ -272,6 +334,9 @@ export async function completeSaleAsRider(
     await getConvexClient(token).mutation(api.sales.completeAsRider, { saleId })
     return { ok: true }
   } catch (error) {
+    if (isConvexErrorCode(error, "RIDER_INACTIVE")) {
+      return { ok: false, error: "Tu cuenta está desactivada" }
+    }
     if (isConvexErrorCode(error, "SALE_NOT_AVAILABLE")) {
       return { ok: false, error: "Ese pedido ya no está en entrega" }
     }

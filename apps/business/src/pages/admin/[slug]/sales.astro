@@ -3,6 +3,7 @@ import type { Id } from "@entregado/backend"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import AdminNav from "../../../components/admin-nav.astro"
+import PaginationNav from "../../../components/pagination-nav.astro"
 import Layout from "../../../layouts/main.astro"
 import { getManagedBusiness } from "../../../lib/businesses"
 import {
@@ -10,13 +11,18 @@ import {
   completeSaleAsOwner,
   fulfillmentLabel,
   listManagedSales,
+  paymentMethodLabel,
+  paymentStatusLabel,
   saleStatusLabel,
+  setSalePaidAsOwner,
   type SaleActionResult,
 } from "../../../lib/sales"
+import { buyerNoticeUrl } from "../../../lib/whatsapp"
 import type { SaleView } from "@entregado/types"
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!slug || !token) {
   return new Response(null, { status: 404 })
@@ -39,6 +45,10 @@ if (Astro.request.method === "POST") {
     result = await completeSaleAsOwner(slug, saleId, token)
   } else if (intent === "cancel") {
     result = await cancelSaleAsOwner(slug, saleId, token)
+  } else if (intent === "pay") {
+    result = await setSalePaidAsOwner(slug, saleId, true, token)
+  } else if (intent === "unpay") {
+    result = await setSalePaidAsOwner(slug, saleId, false, token)
   } else {
     result = { ok: false, error: "Acción no válida" }
   }
@@ -49,7 +59,7 @@ if (Astro.request.method === "POST") {
   actionError = result.error
 }
 
-const { open, recent } = await listManagedSales(slug, token)
+const { open, recent } = await listManagedSales(slug, token, cursor)
 
 function saleSummary(sale: SaleView) {
   return `${sale.quantity} × ${sale.productName} · ${formatCordoba(sale.totalPrice)}`
@@ -71,11 +81,11 @@ function saleSummary(sale: SaleView) {
     <section class="flex flex-col gap-4" aria-labelledby="open-sales-heading">
       <h2 id="open-sales-heading" class="text-sm font-medium">En curso</h2>
       {
-        open.length === 0 ? (
+        open.page.length === 0 ? (
           <p class="text-sm text-muted-foreground">No hay ventas en curso.</p>
         ) : (
           <ul class="flex flex-col gap-6">
-            {open.map((sale) => (
+            {open.page.map((sale) => (
               <li class="flex flex-col gap-2 border-b border-border pb-4">
                 <p class="text-sm font-medium">{saleSummary(sale)}</p>
                 <p class="text-sm text-muted-foreground">
@@ -89,6 +99,15 @@ function saleSummary(sale: SaleView) {
                 {sale.buyerLocation ? (
                   <p class="text-sm text-muted-foreground">
                     {sale.buyerLocation}
+                  </p>
+                ) : null}
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(sale.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(sale.paymentStatus)}
+                </p>
+                {sale.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(sale.totalPrice)}
                   </p>
                 ) : null}
                 <div class="flex flex-wrap gap-3">
@@ -105,6 +124,27 @@ function saleSummary(sale: SaleView) {
                       </button>
                     </form>
                   ) : null}
+                  <a
+                    class={buttonVariants({ variant: "outline" })}
+                    href={buyerNoticeUrl(sale)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Avisar al cliente
+                  </a>
+                  <form method="post">
+                    <input type="hidden" name="saleId" value={sale.id} />
+                    <button
+                      class={buttonVariants({ variant: "outline" })}
+                      type="submit"
+                      name="intent"
+                      value={sale.paymentStatus === "paid" ? "unpay" : "pay"}
+                    >
+                      {sale.paymentStatus === "paid"
+                        ? "Marcar sin pagar"
+                        : "Marcar pagado"}
+                    </button>
+                  </form>
                   <form method="post">
                     <input type="hidden" name="saleId" value={sale.id} />
                     <button
@@ -122,6 +162,13 @@ function saleSummary(sale: SaleView) {
           </ul>
         )
       }
+
+      <PaginationNav
+        basePath={`/admin/${slug}/sales`}
+        cursor={cursor}
+        isDone={open.isDone}
+        continueCursor={open.continueCursor}
+      />
     </section>
 
     <section class="flex flex-col gap-4" aria-labelledby="recent-sales-heading">
@@ -134,7 +181,7 @@ function saleSummary(sale: SaleView) {
         ) : (
           <ul class="flex flex-col gap-3">
             {recent.map((sale) => (
-              <li class="flex flex-col gap-0.5 border-b border-border pb-3">
+              <li class="flex flex-col gap-2 border-b border-border pb-3">
                 <p class="text-sm font-medium">{saleSummary(sale)}</p>
                 <p class="text-sm text-muted-foreground">
                   {saleStatusLabel(sale.status)} ·{" "}
@@ -142,6 +189,28 @@ function saleSummary(sale: SaleView) {
                   {" · "}
                   {sale.buyerName}
                 </p>
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(sale.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(sale.paymentStatus)}
+                </p>
+                {sale.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(sale.totalPrice)}
+                  </p>
+                ) : null}
+                <form method="post">
+                  <input type="hidden" name="saleId" value={sale.id} />
+                  <button
+                    class={buttonVariants({ variant: "outline" })}
+                    type="submit"
+                    name="intent"
+                    value={sale.paymentStatus === "paid" ? "unpay" : "pay"}
+                  >
+                    {sale.paymentStatus === "paid"
+                      ? "Marcar sin pagar"
+                      : "Marcar pagado"}
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

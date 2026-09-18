@@ -40,6 +40,8 @@ export function nicaraguaLocalDigits(e164: string): string {
   return digits
 }
 
-export function whatsappMeUrl(e164: string): string {
-  return `https://wa.me/${e164.replace(/^\+/, "")}`
+export function whatsappMeUrl(e164: string, message?: string): string {
+  const url = `https://wa.me/${e164.replace(/^\+/, "")}`
+  const text = message?.trim() ?? ""
+  return text.length > 0 ? `${url}?text=${encodeURIComponent(text)}` : url
 }

@@ -1,10 +1,11 @@
-import type { ManagedBusiness } from "@entregado/types"
 import { z } from "zod"
 import { fieldErrorsFromZod } from "./businesses"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const SUSPENSION_REASON_MAX = 200
+const ADMIN_BUSINESS_PAGE_SIZE = 20
 
 const suspendBusinessSchema = z.object({
   reason: z
@@ -26,9 +27,17 @@ export type SuspendResult =
 export type AdminActionResult = { ok: true } | { ok: false; error: string }
 
 export async function listAdminBusinesses(
-  token: string
-): Promise<ManagedBusiness[]> {
-  return await getConvexClient(token).query(api.businesses.listAllForAdmin, {})
+  token: string,
+  cursor: string | null
+) {
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.businesses.listAllForAdmin, {
+      paginationOpts: {
+        numItems: ADMIN_BUSINESS_PAGE_SIZE,
+        cursor: pageCursor,
+      },
+    })
+  )
 }
 
 export async function suspendBusiness(

@@ -1,11 +1,13 @@
 ---
 import { buttonVariants } from "@workspace/ui/components/button"
 import Layout from "../../layouts/main.astro"
+import PaginationNav from "../../components/pagination-nav.astro"
 import { listAdminBusinesses, reactivateBusiness } from "../../lib/admin"
 import { isBusinessSuspended, suspensionLabel } from "../../lib/businesses"
 
 const token = Astro.locals.convexToken
 const user = Astro.locals.user
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!token || !user) {
   return Astro.redirect("/login", 303)
@@ -28,7 +30,7 @@ if (Astro.request.method === "POST") {
   actionError = result.error
 }
 
-const businesses = await listAdminBusinesses(token)
+const businesses = await listAdminBusinesses(token, cursor)
 ---
 
 <Layout title="Directorio | Entregado">
@@ -64,11 +66,11 @@ const businesses = await listAdminBusinesses(token)
     }
 
     {
-      businesses.length === 0 ? (
+      businesses.page.length === 0 ? (
         <p class="text-sm text-muted-foreground">Todavía no hay negocios.</p>
       ) : (
         <ul class="flex flex-col gap-4">
-          {businesses.map((business) => (
+          {businesses.page.map((business) => (
             <li class="flex items-start justify-between gap-4 border-b border-border pb-4">
               <div class="flex min-w-0 flex-col gap-0.5">
                 <a
@@ -109,5 +111,12 @@ const businesses = await listAdminBusinesses(token)
         </ul>
       )
     }
+
+    <PaginationNav
+      basePath="/admin/directory"
+      cursor={cursor}
+      isDone={businesses.isDone}
+      continueCursor={businesses.continueCursor}
+    />
   </main>
 </Layout>
