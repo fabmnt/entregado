@@ -1,42 +1,82 @@
 import { execFileSync } from "node:child_process"
 import { defineConfig, devices } from "@playwright/test"
 
-const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 4321)
+// Both apps have a canonical port, but Playwright reuses whatever is already
+// listening, so a busy port must never be killed. Each app probes its candidate
+// ports: prefer the one already serving that app, otherwise the first free port,
+// and only then the canonical port so a foreign service on it fails loudly
+// instead of being tested.
+const CONNECTION_REFUSED_EXIT_CODE = 7
 
-// The business app has a canonical port (4322), but Playwright reuses whatever is
-// already listening, so a busy port must never be killed. If another local server
-// holds 4322, use the next local port that actually serves the Entregado business
-// app. When nothing is running, prefer the first free candidate so the dev server
-// Playwright starts does not collide with another project.
-type PortProbe = { port: number; responding: boolean; body: string }
+type PortState = "serving" | "occupied" | "free"
 
-function probePort(port: number): PortProbe {
+type PortProbe = { port: number; state: PortState; body: string }
+
+function probePort(port: number, path: string): PortProbe {
   try {
     const body = execFileSync(
       "curl",
-      ["-s", "--max-time", "3", `http://localhost:${port}/register`],
+      ["-s", "--max-time", "3", `http://localhost:${port}${path}`],
       { encoding: "utf8" }
     )
-    return { port, responding: true, body }
-  } catch {
-    return { port, responding: false, body: "" }
+    return { port, state: "serving", body }
+  } catch (error) {
+    // Only a refused connection means the port is free; a service that accepts
+    // the connection but never answers must not be reused.
+    const refused =
+      (error as { status?: number }).status === CONNECTION_REFUSED_EXIT_CODE
+    return { port, state: refused ? "free" : "occupied", body: "" }
   }
 }
 
-// Unique to the business app register page (Spanish UI copy).
+function selectPort(
+  candidates: number[],
+  path: string,
+  marker: string,
+  canonical: number
+): number {
+  const probes = candidates.map((port) => probePort(port, path))
+
+  const serving = probes.find(
+    (probe) => probe.state === "serving" && probe.body.includes(marker)
+  )
+  if (serving) {
+    return serving.port
+  }
+
+  return probes.find((probe) => probe.state === "free")?.port ?? canonical
+}
+
+// Unique to each app: the business register page and the web directory copy.
 const BUSINESS_APP_MARKER = "Crear cuenta"
+const WEB_APP_MARKER = "Una tienda por negocio"
+
+const WEB_PORT_CANONICAL = 4321
+const BUSINESS_PORT_CANONICAL = 4322
+
+const WEB_PORT_CANDIDATES = process.env.E2E_WEB_PORT
+  ? [Number(process.env.E2E_WEB_PORT)]
+  : [WEB_PORT_CANONICAL, 4326, 4327, 4328]
+
+const WEB_PORT = selectPort(
+  WEB_PORT_CANDIDATES,
+  "/",
+  WEB_APP_MARKER,
+  Number(process.env.E2E_WEB_PORT ?? WEB_PORT_CANONICAL)
+)
 
 const BUSINESS_PORT_CANDIDATES = process.env.E2E_BUSINESS_PORT
   ? [Number(process.env.E2E_BUSINESS_PORT)]
-  : [4322, 4323, 4324, 4325]
+  : [BUSINESS_PORT_CANONICAL, 4323, 4324, 4325].filter(
+      (port) => port !== WEB_PORT
+    )
 
-const businessPortProbes = BUSINESS_PORT_CANDIDATES.map(probePort)
-const BUSINESS_PORT =
-  businessPortProbes.find(
-    (probe) => probe.responding && probe.body.includes(BUSINESS_APP_MARKER)
-  )?.port ??
-  businessPortProbes.find((probe) => !probe.responding)?.port ??
-  Number(process.env.E2E_BUSINESS_PORT ?? 4322)
+const BUSINESS_PORT = selectPort(
+  BUSINESS_PORT_CANDIDATES,
+  "/register",
+  BUSINESS_APP_MARKER,
+  Number(process.env.E2E_BUSINESS_PORT ?? BUSINESS_PORT_CANONICAL)
+)
 
 const webURL = `http://localhost:${WEB_PORT}`
 const businessURL = `http://localhost:${BUSINESS_PORT}`
@@ -54,7 +94,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `pnpm --filter web exec astro dev --port ${WEB_PORT}`,
+      command: `PUBLIC_BUSINESS_URL=${businessURL} pnpm --filter web exec astro dev --port ${WEB_PORT}`,
       url: webURL,
       reuseExistingServer: true,
       timeout: 120_000,
