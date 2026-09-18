@@ -1,8 +1,27 @@
 import type { DirectoryBusiness } from "@entregado/types"
 import { api, getConvexClient } from "./convex"
 
-export async function listBusinesses(): Promise<DirectoryBusiness[]> {
-  return await getConvexClient().query(api.businesses.list, {})
+const DIRECTORY_PAGE_SIZE = 12
+
+// Convex rejects cursors that do not belong to this query, so a stale or
+// hand-edited link falls back to the first page instead of failing.
+function isInvalidCursorError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("InvalidCursor")
+}
+
+export async function listBusinesses(cursor: string | null) {
+  try {
+    return await getConvexClient().query(api.businesses.list, {
+      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor },
+    })
+  } catch (error) {
+    if (cursor === null || !isInvalidCursorError(error)) {
+      throw error
+    }
+    return await getConvexClient().query(api.businesses.list, {
+      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor: null },
+    })
+  }
 }
 
 export async function getBusinessBySlug(

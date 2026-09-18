@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
@@ -14,7 +18,7 @@ import {
   storefront,
 } from "./schema"
 
-const DIRECTORY_LIST_LIMIT = 100
+const STOREFRONT_PRODUCT_LIMIT = 100
 const RESERVED_SLUGS = new Set([
   "login",
   "register",
@@ -99,14 +103,19 @@ function optionalText(value: string): string | undefined {
 }
 
 export const list = query({
-  args: {},
-  returns: v.array(directoryBusiness),
-  handler: async (ctx) => {
-    const rows = await ctx.db
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(directoryBusiness),
+  handler: async (ctx, args) => {
+    const result = await ctx.db
       .query("businesses")
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
-    return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+      .paginate(args.paginationOpts)
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toDirectoryBusiness(ctx, row))
+      ),
+    }
   },
 })
 
@@ -141,7 +150,7 @@ export const getStoreBySlug = query({
         q.eq("businessId", business._id).eq("available", true)
       )
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
+      .take(STOREFRONT_PRODUCT_LIMIT)
 
     const products = await Promise.all(
       productRows.map((product) => toStoreProduct(ctx, product))
@@ -155,30 +164,40 @@ export const getStoreBySlug = query({
 })
 
 export const listForSignedIn = query({
-  args: {},
-  returns: v.array(directoryBusiness),
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(directoryBusiness),
+  handler: async (ctx, args) => {
     const user = await requireSignedInUser(ctx)
     if (!isBusinessManagerKind(user.kind)) {
       throw new ConvexError("FORBIDDEN")
     }
 
     if (user.kind === "admin") {
-      const rows = await ctx.db
+      const result = await ctx.db
         .query("businesses")
         .order("desc")
-        .take(DIRECTORY_LIST_LIMIT)
-      return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+        .paginate(args.paginationOpts)
+      return {
+        ...result,
+        page: await Promise.all(
+          result.page.map((row) => toDirectoryBusiness(ctx, row))
+        ),
+      }
     }
 
-    const rows = await ctx.db
+    const result = await ctx.db
       .query("businesses")
       .withIndex("by_owner", (q) =>
         q.eq("ownerTokenIdentifier", user.tokenIdentifier)
       )
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
-    return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+      .paginate(args.paginationOpts)
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toDirectoryBusiness(ctx, row))
+      ),
+    }
   },
 })
 

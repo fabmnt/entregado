@@ -4,6 +4,7 @@ import { z } from "zod"
 import { fieldErrorsFromZod } from "./businesses"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const RIDER_NAME_MAX = 80
 
@@ -47,8 +48,19 @@ export type UpdateRiderResult =
 
 export type RiderActionResult = { ok: true } | { ok: false; error: string }
 
-export async function listManagedRiders(slug: string, token: string) {
-  return await getConvexClient(token).query(api.riders.listManaged, { slug })
+const RIDER_PAGE_SIZE = 20
+
+export async function listManagedRiders(
+  slug: string,
+  token: string,
+  cursor: string | null
+) {
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.riders.listManaged, {
+      slug,
+      paginationOpts: { numItems: RIDER_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function getManagedRider(

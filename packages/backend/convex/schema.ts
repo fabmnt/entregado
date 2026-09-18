@@ -131,7 +131,8 @@ export default defineSchema({
   })
     .index("by_auth_user", ["authUserId"])
     .index("by_kind", ["kind"])
-    .index("by_businessId", ["businessId"]),
+    .index("by_businessId", ["businessId"])
+    .index("by_businessId_and_kind", ["businessId", "kind"]),
   businesses: defineTable(businessFields)
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerTokenIdentifier"])
@@ -151,6 +152,7 @@ export default defineSchema({
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
     status: saleStatus,
+    open: v.boolean(),
     // Optional so sales created before payment tracking still validate.
     paymentMethod: v.optional(paymentMethod),
     paymentStatus: v.optional(paymentStatus),
@@ -161,6 +163,7 @@ export default defineSchema({
     cancelledAt: v.optional(v.number()),
   })
     .index("by_businessId", ["businessId"])
+    .index("by_businessId_and_open", ["businessId", "open"])
     .index("by_businessId_and_fulfillment_and_status", [
       "businessId",
       "fulfillment",

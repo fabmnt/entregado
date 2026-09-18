@@ -14,6 +14,7 @@ import { z } from "zod"
 import { fieldErrorsFromZod } from "./businesses"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const BUYER_NAME_MAX = 80
 const BUYER_LOCATION_MAX = 500
@@ -226,8 +227,19 @@ export async function createSale(
   }
 }
 
-export async function listManagedSales(slug: string, token: string) {
-  return await getConvexClient(token).query(api.sales.listManaged, { slug })
+const OPEN_SALE_PAGE_SIZE = 20
+
+export async function listManagedSales(
+  slug: string,
+  token: string,
+  cursor: string | null
+) {
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.sales.listManaged, {
+      slug,
+      paginationOpts: { numItems: OPEN_SALE_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function completeSaleAsOwner(
