@@ -1,6 +1,7 @@
 ---
 import type { Id } from "@entregado/backend"
 import { formatCordoba } from "@entregado/utils"
+import { buttonVariants } from "@workspace/ui/components/button"
 import Layout from "../../../layouts/main.astro"
 import { getStorefront } from "../../../lib/businesses"
 import {
@@ -8,6 +9,7 @@ import {
   getPublicSale,
   saleStatusLabel,
 } from "../../../lib/sales"
+import { orderInquiryUrl } from "../../../lib/whatsapp"
 
 export const prerender = false
 
@@ -67,5 +69,18 @@ if (!store || !sale) {
         <dd>{sale.buyerPhone}</dd>
       </div>
     </dl>
+
+    {
+      store.business.whatsapp ? (
+        <a
+          class={buttonVariants({ variant: "outline" })}
+          href={orderInquiryUrl(store.business.whatsapp, sale)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Consultar por WhatsApp
+        </a>
+      ) : null
+    }
   </main>
 </Layout>

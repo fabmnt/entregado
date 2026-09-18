@@ -9,6 +9,7 @@ import {
   fulfillmentLabel,
   listRiderSales,
 } from "../../lib/sales"
+import { riderNoticeUrl } from "../../lib/whatsapp"
 
 const token = Astro.locals.convexToken
 const user = Astro.locals.user
@@ -91,6 +92,24 @@ const board = await listRiderSales(token)
                 Marcar entregado
               </button>
             </form>
+            <div class="flex flex-wrap gap-3">
+              <a
+                class={buttonVariants({ variant: "outline" })}
+                href={riderNoticeUrl(board.current, "on_the_way")}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Avisar: voy en camino
+              </a>
+              <a
+                class={buttonVariants({ variant: "outline" })}
+                href={riderNoticeUrl(board.current, "arriving")}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Avisar: estoy llegando
+              </a>
+            </div>
           </div>
         ) : board.pending.length === 0 ? (
           <p class="text-sm text-muted-foreground">
