@@ -81,6 +81,12 @@ const board = await listRiderSales(token)
             {board.current.buyerLocation ? (
               <p class="text-sm">{board.current.buyerLocation}</p>
             ) : null}
+            {board.current.paymentMethod === "cash_on_delivery" &&
+            board.current.paymentStatus === "pending" ? (
+              <p class="text-sm font-medium">
+                Cobrar {formatCordoba(board.current.totalPrice)} al entregar
+              </p>
+            ) : null}
             <form method="post">
               <input type="hidden" name="saleId" value={board.current.id} />
               <button

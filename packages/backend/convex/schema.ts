@@ -21,6 +21,11 @@ export const fulfillmentMode = v.union(
   v.literal("delivery"),
   v.literal("pickup")
 )
+export const paymentMethod = v.union(
+  v.literal("cash_on_delivery"),
+  v.literal("transfer")
+)
+export const paymentStatus = v.union(v.literal("pending"), v.literal("paid"))
 
 export const businessFields = v.object({
   slug: v.string(),
@@ -94,6 +99,8 @@ export const saleView = v.object({
   buyerLocation: v.union(v.string(), v.null()),
   fulfillment: fulfillmentMode,
   status: saleStatus,
+  paymentMethod: v.union(paymentMethod, v.null()),
+  paymentStatus: paymentStatus,
   riderName: v.union(v.string(), v.null()),
   createdAt: v.string(),
 })
@@ -134,6 +141,10 @@ export default defineSchema({
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
     status: saleStatus,
+    // Optional so sales created before payment tracking still validate.
+    paymentMethod: v.optional(paymentMethod),
+    paymentStatus: v.optional(paymentStatus),
+    paidAt: v.optional(v.number()),
     riderUserId: v.optional(v.id("users")),
     riderName: v.optional(v.string()),
     completedAt: v.optional(v.number()),
