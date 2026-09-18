@@ -47,10 +47,17 @@ export async function getSignedInUser(
     .withIndex("by_auth_user", (q) => q.eq("authUserId", user._id))
     .unique()
 
+  // Riders are renamed from the business panel, so their profile name is the
+  // source of truth; owners keep the name from sign-up.
+  const name =
+    profile?.kind === "rider" && profile.name
+      ? profile.name
+      : (user.name ?? profile?.name ?? "")
+
   return {
     tokenIdentifier: identity.tokenIdentifier,
     email: user.email,
-    name: user.name ?? profile?.name ?? "",
+    name,
     kind: profile?.kind ?? "business_owner",
     profileId: profile?._id ?? null,
     businessId: profile?.businessId ?? null,

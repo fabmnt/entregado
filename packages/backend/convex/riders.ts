@@ -133,6 +133,24 @@ export const setActive = mutation({
   handler: async (ctx, args) => {
     const rider = await requireManagedRider(ctx, args.slug, args.riderId)
 
+    if (!args.active) {
+      // A deactivated rider is redirected away from the board, so an accepted
+      // delivery would sit unfinished forever. Hand it back to the board.
+      const assigned = await ctx.db
+        .query("sales")
+        .withIndex("by_riderUserId_and_status", (q) =>
+          q.eq("riderUserId", rider._id).eq("status", "accepted")
+        )
+        .collect()
+      for (const sale of assigned) {
+        await ctx.db.patch("sales", sale._id, {
+          status: "pending",
+          riderUserId: undefined,
+          riderName: undefined,
+        })
+      }
+    }
+
     await ctx.db.patch("users", rider._id, { active: args.active })
     const row = await ctx.db.get("users", rider._id)
     if (!row) {

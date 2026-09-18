@@ -277,7 +277,8 @@ export const accept = mutation({
       throw new ConvexError("HAS_ACTIVE_SALE")
     }
 
-    const riderName = user.name.trim() || rider.name || user.email
+    // The owner edits the rider name in the panel, so prefer that profile name.
+    const riderName = rider.name?.trim() || user.name.trim() || user.email
     await ctx.db.patch("sales", sale._id, {
       status: "accepted",
       riderUserId: rider._id,
