@@ -9,7 +9,12 @@ import {
 } from "./access"
 import { parseNicaraguaE164 } from "./phone"
 import { productSupportsDelivery } from "./products"
-import { fulfillmentMode, publicSaleView, saleView } from "./schema"
+import {
+  fulfillmentMode,
+  paymentMethod,
+  publicSaleView,
+  saleView,
+} from "./schema"
 
 const SALE_LIST_LIMIT = 100
 const MAX_QUANTITY = 99
@@ -28,6 +33,8 @@ function toSaleView(doc: Doc<"sales">) {
     buyerLocation: doc.buyerLocation ?? null,
     fulfillment: doc.fulfillment,
     status: doc.status,
+    paymentMethod: doc.paymentMethod ?? null,
+    paymentStatus: doc.paymentStatus ?? "pending",
     riderName: doc.riderName ?? null,
     createdAt: new Date(doc._creationTime).toISOString(),
   }
@@ -195,6 +202,7 @@ export const create = mutation({
     buyerPhone: v.string(),
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
+    paymentMethod: paymentMethod,
   },
   returns: saleView,
   handler: async (ctx, args) => {
@@ -235,6 +243,8 @@ export const create = mutation({
       ...(wantsDelivery && buyerLocation ? { buyerLocation } : {}),
       fulfillment: wantsDelivery ? "delivery" : "pickup",
       status: "pending",
+      paymentMethod: args.paymentMethod,
+      paymentStatus: "pending",
     })
     const row = await ctx.db.get("sales", id)
     if (!row) {
@@ -346,6 +356,32 @@ export const cancelAsOwner = mutation({
     await ctx.db.patch("sales", sale._id, {
       status: "cancelled",
       cancelledAt: Date.now(),
+    })
+    const row = await ctx.db.get("sales", sale._id)
+    if (!row) {
+      throw new Error("Update did not persist the sale")
+    }
+    return toSaleView(row)
+  },
+})
+
+export const setPaidAsOwner = mutation({
+  args: {
+    slug: v.string(),
+    saleId: v.id("sales"),
+    paid: v.boolean(),
+  },
+  returns: saleView,
+  handler: async (ctx, args) => {
+    const business = await requireManagedBusiness(ctx, args.slug)
+    const sale = await ctx.db.get("sales", args.saleId)
+    if (!sale || sale.businessId !== business._id) {
+      throw new ConvexError("NOT_FOUND")
+    }
+
+    await ctx.db.patch("sales", sale._id, {
+      paymentStatus: args.paid ? "paid" : "pending",
+      paidAt: args.paid ? Date.now() : undefined,
     })
     const row = await ctx.db.get("sales", sale._id)
     if (!row) {
