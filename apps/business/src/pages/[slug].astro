@@ -1,11 +1,8 @@
 ---
-import {
-  formatCordoba,
-  nicaraguaLocalDigits,
-  whatsappMeUrl,
-} from "@entregado/utils"
+import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import Layout from "../layouts/main.astro"
 import { getStorefront } from "../lib/businesses"
+import { businessInquiryUrl } from "../lib/whatsapp"
 
 export const prerender = false
 
@@ -72,9 +69,11 @@ const whatsapp = business.whatsapp
         whatsapp ? (
           <a
             class="text-sm font-medium underline-offset-4 hover:underline"
-            href={whatsappMeUrl(whatsapp)}
+            href={businessInquiryUrl(business.name, whatsapp)}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Escribir por WhatsApp
+            Consultar por WhatsApp
           </a>
         ) : null
       }

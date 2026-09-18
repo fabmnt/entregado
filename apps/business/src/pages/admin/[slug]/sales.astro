@@ -10,9 +10,13 @@ import {
   completeSaleAsOwner,
   fulfillmentLabel,
   listManagedSales,
+  paymentMethodLabel,
+  paymentStatusLabel,
   saleStatusLabel,
+  setSalePaidAsOwner,
   type SaleActionResult,
 } from "../../../lib/sales"
+import { buyerNoticeUrl } from "../../../lib/whatsapp"
 import type { SaleView } from "@entregado/types"
 
 const slug = Astro.params.slug
@@ -39,6 +43,10 @@ if (Astro.request.method === "POST") {
     result = await completeSaleAsOwner(slug, saleId, token)
   } else if (intent === "cancel") {
     result = await cancelSaleAsOwner(slug, saleId, token)
+  } else if (intent === "pay") {
+    result = await setSalePaidAsOwner(slug, saleId, true, token)
+  } else if (intent === "unpay") {
+    result = await setSalePaidAsOwner(slug, saleId, false, token)
   } else {
     result = { ok: false, error: "Acción no válida" }
   }
@@ -91,6 +99,15 @@ function saleSummary(sale: SaleView) {
                     {sale.buyerLocation}
                   </p>
                 ) : null}
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(sale.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(sale.paymentStatus)}
+                </p>
+                {sale.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(sale.totalPrice)}
+                  </p>
+                ) : null}
                 <div class="flex flex-wrap gap-3">
                   {sale.fulfillment === "pickup" ? (
                     <form method="post">
@@ -105,6 +122,27 @@ function saleSummary(sale: SaleView) {
                       </button>
                     </form>
                   ) : null}
+                  <a
+                    class={buttonVariants({ variant: "outline" })}
+                    href={buyerNoticeUrl(sale)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Avisar al cliente
+                  </a>
+                  <form method="post">
+                    <input type="hidden" name="saleId" value={sale.id} />
+                    <button
+                      class={buttonVariants({ variant: "outline" })}
+                      type="submit"
+                      name="intent"
+                      value={sale.paymentStatus === "paid" ? "unpay" : "pay"}
+                    >
+                      {sale.paymentStatus === "paid"
+                        ? "Marcar sin pagar"
+                        : "Marcar pagado"}
+                    </button>
+                  </form>
                   <form method="post">
                     <input type="hidden" name="saleId" value={sale.id} />
                     <button
@@ -134,7 +172,7 @@ function saleSummary(sale: SaleView) {
         ) : (
           <ul class="flex flex-col gap-3">
             {recent.map((sale) => (
-              <li class="flex flex-col gap-0.5 border-b border-border pb-3">
+              <li class="flex flex-col gap-2 border-b border-border pb-3">
                 <p class="text-sm font-medium">{saleSummary(sale)}</p>
                 <p class="text-sm text-muted-foreground">
                   {saleStatusLabel(sale.status)} ·{" "}
@@ -142,6 +180,28 @@ function saleSummary(sale: SaleView) {
                   {" · "}
                   {sale.buyerName}
                 </p>
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(sale.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(sale.paymentStatus)}
+                </p>
+                {sale.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(sale.totalPrice)}
+                  </p>
+                ) : null}
+                <form method="post">
+                  <input type="hidden" name="saleId" value={sale.id} />
+                  <button
+                    class={buttonVariants({ variant: "outline" })}
+                    type="submit"
+                    name="intent"
+                    value={sale.paymentStatus === "paid" ? "unpay" : "pay"}
+                  >
+                    {sale.paymentStatus === "paid"
+                      ? "Marcar sin pagar"
+                      : "Marcar pagado"}
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

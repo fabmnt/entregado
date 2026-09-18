@@ -2,7 +2,10 @@ import type { Id } from "@entregado/backend"
 import {
   FULFILLMENT_MODES,
   MAX_SALE_QUANTITY,
+  PAYMENT_METHODS,
   type FulfillmentMode,
+  type PaymentMethod,
+  type PaymentStatus,
   type SaleStatus,
   type SaleView,
 } from "@entregado/types"
@@ -41,6 +44,9 @@ export const checkoutSchema = z
     fulfillment: z.enum(FULFILLMENT_MODES, {
       error: "Elige delivery o retiro",
     }),
+    paymentMethod: z.enum(PAYMENT_METHODS, {
+      error: "Elige cómo vas a pagar",
+    }),
     buyerLocation: z
       .string()
       .trim()
@@ -61,7 +67,12 @@ export const checkoutSchema = z
 
 export type CheckoutFieldErrors = Partial<
   Record<
-    "quantity" | "buyerName" | "buyerPhone" | "fulfillment" | "buyerLocation",
+    | "quantity"
+    | "buyerName"
+    | "buyerPhone"
+    | "fulfillment"
+    | "paymentMethod"
+    | "buyerLocation",
     string
   >
 >
@@ -88,6 +99,20 @@ export function saleStatusLabel(status: SaleStatus): string {
 
 export function fulfillmentLabel(fulfillment: FulfillmentMode): string {
   return fulfillment === "delivery" ? "Delivery" : "Retiro"
+}
+
+export function paymentMethodLabel(method: PaymentMethod | null): string {
+  if (method === "cash_on_delivery") {
+    return "Efectivo al entregar"
+  }
+  if (method === "transfer") {
+    return "Transferencia"
+  }
+  return "Sin definir"
+}
+
+export function paymentStatusLabel(status: PaymentStatus): string {
+  return status === "paid" ? "Pagado" : "Sin pagar"
 }
 
 export async function getStoreProduct(slug: string, productId: Id<"products">) {
@@ -138,6 +163,7 @@ export async function createSale(
       buyerName: parsed.data.buyerName,
       buyerPhone: parsed.data.buyerPhone,
       fulfillment: parsed.data.fulfillment,
+      paymentMethod: parsed.data.paymentMethod,
       ...(wantsDelivery ? { buyerLocation: parsed.data.buyerLocation } : {}),
     })
     return { ok: true, sale }
@@ -233,6 +259,27 @@ export async function cancelSaleAsOwner(
     return { ok: true }
   } catch (error) {
     return mapOwnerSaleError(error, "cancelar")
+  }
+}
+
+export async function setSalePaidAsOwner(
+  slug: string,
+  saleId: Id<"sales">,
+  paid: boolean,
+  token: string
+): Promise<SaleActionResult> {
+  try {
+    await getConvexClient(token).mutation(api.sales.setPaidAsOwner, {
+      slug,
+      saleId,
+      paid,
+    })
+    return { ok: true }
+  } catch (error) {
+    return mapOwnerSaleError(
+      error,
+      paid ? "marcar como pagada" : "marcar como pendiente"
+    )
   }
 }
 

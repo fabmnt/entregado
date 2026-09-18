@@ -92,6 +92,8 @@ export type SaleView = {
   buyerLocation: string | null
   fulfillment: FulfillmentMode
   status: SaleStatus
+  paymentMethod: PaymentMethod | null
+  paymentStatus: PaymentStatus
   riderName: string | null
   createdAt: string
 }
@@ -107,6 +109,9 @@ export const MAX_SALE_QUANTITY = 99
 
 export const PAYMENT_METHODS = ["cash_on_delivery", "transfer"] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+export const PAYMENT_STATUSES = ["pending", "paid"] as const
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 
 export const COUNTRY_ISO = "NI"
 export const PHONE_COUNTRY_CODE = "505"
