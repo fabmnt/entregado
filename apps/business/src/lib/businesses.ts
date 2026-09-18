@@ -11,6 +11,7 @@ import { parseNicaraguaPhone } from "@entregado/utils"
 import { z } from "zod"
 import { api, getConvexClient } from "./convex"
 import { isConvexErrorCode } from "./convex-error"
+import { withCursorFallback } from "./pagination"
 
 const SLUG_MAX_LENGTH = 48
 const DIRECTORY_TEXT_MAX_LENGTH = 500
@@ -125,10 +126,17 @@ export type UpdateProfileResult =
   | { ok: false; status: 401; error: string; fieldErrors: ProfileFieldErrors }
   | { ok: false; status: 403; error: string; fieldErrors: ProfileFieldErrors }
 
+const BUSINESS_PAGE_SIZE = 20
+
 export async function listManagedBusinesses(
-  token: string
-): Promise<DirectoryBusiness[]> {
-  return await getConvexClient(token).query(api.businesses.listForSignedIn, {})
+  token: string,
+  cursor: string | null
+) {
+  return await withCursorFallback(cursor, (pageCursor) =>
+    getConvexClient(token).query(api.businesses.listForSignedIn, {
+      paginationOpts: { numItems: BUSINESS_PAGE_SIZE, cursor: pageCursor },
+    })
+  )
 }
 
 export async function getManagedBusiness(
@@ -142,6 +150,28 @@ export async function getManagedBusiness(
 
 export async function getStorefront(slug: string): Promise<Storefront | null> {
   return await getConvexClient().query(api.businesses.getStoreBySlug, { slug })
+}
+
+const SUSPENSION_DATE_FORMAT = new Intl.DateTimeFormat("es-NI", {
+  dateStyle: "long",
+  timeZone: "America/Managua",
+})
+
+export function isBusinessSuspended(business: ManagedBusiness): boolean {
+  return business.suspendedAt !== null
+}
+
+export function suspensionLabel(business: ManagedBusiness): string | null {
+  if (business.suspendedAt === null) {
+    return null
+  }
+
+  const suspendedOn = `Suspendido el ${SUSPENSION_DATE_FORMAT.format(
+    new Date(business.suspendedAt)
+  )}`
+  return business.suspensionReason
+    ? `${suspendedOn} · ${business.suspensionReason}`
+    : suspendedOn
 }
 
 export async function createBusiness(

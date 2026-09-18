@@ -4,6 +4,7 @@ import type { OrderView } from "@entregado/types"
 import { buttonVariants } from "@workspace/ui/components/button"
 import { formatCordoba, nicaraguaLocalDigits } from "@entregado/utils"
 import AdminNav from "../../../components/admin-nav.astro"
+import PaginationNav from "../../../components/pagination-nav.astro"
 import Layout from "../../../layouts/main.astro"
 import { getManagedBusiness } from "../../../lib/businesses"
 import {
@@ -14,11 +15,16 @@ import {
   orderItemLines,
   orderStatusLabel,
   orderUnitCountLabel,
+  paymentMethodLabel,
+  paymentStatusLabel,
+  setOrderPaidAsOwner,
   type OrderActionResult,
 } from "../../../lib/orders"
+import { buyerNoticeUrl } from "../../../lib/whatsapp"
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
+const cursor = Astro.url.searchParams.get("cursor")
 
 if (!slug || !token) {
   return new Response(null, { status: 404 })
@@ -41,6 +47,10 @@ if (Astro.request.method === "POST") {
     result = await completeOrderAsOwner(slug, orderId, token)
   } else if (intent === "cancel") {
     result = await cancelOrderAsOwner(slug, orderId, token)
+  } else if (intent === "pay") {
+    result = await setOrderPaidAsOwner(slug, orderId, true, token)
+  } else if (intent === "unpay") {
+    result = await setOrderPaidAsOwner(slug, orderId, false, token)
   } else {
     result = { ok: false, error: "Acción no válida" }
   }
@@ -51,7 +61,7 @@ if (Astro.request.method === "POST") {
   actionError = result.error
 }
 
-const { open, recent } = await listManagedOrders(slug, token)
+const { open, recent } = await listManagedOrders(slug, token, cursor)
 
 function orderSummary(order: OrderView) {
   return `${orderUnitCountLabel(order.itemCount)} · ${formatCordoba(order.totalPrice)}`
@@ -73,11 +83,11 @@ function orderSummary(order: OrderView) {
     <section class="flex flex-col gap-4" aria-labelledby="open-orders-heading">
       <h2 id="open-orders-heading" class="text-sm font-medium">En curso</h2>
       {
-        open.length === 0 ? (
+        open.page.length === 0 ? (
           <p class="text-sm text-muted-foreground">No hay pedidos en curso.</p>
         ) : (
           <ul class="flex flex-col gap-6">
-            {open.map((order) => (
+            {open.page.map((order) => (
               <li class="flex flex-col gap-2 border-b border-border pb-4">
                 <p class="text-sm font-medium">{orderSummary(order)}</p>
                 <ul class="flex flex-col gap-0.5 text-sm text-muted-foreground">
@@ -98,6 +108,15 @@ function orderSummary(order: OrderView) {
                     {order.buyerLocation}
                   </p>
                 ) : null}
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(order.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(order.paymentStatus)}
+                </p>
+                {order.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(order.totalPrice)}
+                  </p>
+                ) : null}
                 <div class="flex flex-wrap gap-3">
                   {order.fulfillment === "pickup" ? (
                     <form method="post">
@@ -112,6 +131,27 @@ function orderSummary(order: OrderView) {
                       </button>
                     </form>
                   ) : null}
+                  <a
+                    class={buttonVariants({ variant: "outline" })}
+                    href={buyerNoticeUrl(order)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Avisar al cliente
+                  </a>
+                  <form method="post">
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <button
+                      class={buttonVariants({ variant: "outline" })}
+                      type="submit"
+                      name="intent"
+                      value={order.paymentStatus === "paid" ? "unpay" : "pay"}
+                    >
+                      {order.paymentStatus === "paid"
+                        ? "Marcar sin pagar"
+                        : "Marcar pagado"}
+                    </button>
+                  </form>
                   <form method="post">
                     <input type="hidden" name="orderId" value={order.id} />
                     <button
@@ -129,6 +169,13 @@ function orderSummary(order: OrderView) {
           </ul>
         )
       }
+
+      <PaginationNav
+        basePath={`/admin/${slug}/sales`}
+        cursor={cursor}
+        isDone={open.isDone}
+        continueCursor={open.continueCursor}
+      />
     </section>
 
     <section
@@ -144,7 +191,7 @@ function orderSummary(order: OrderView) {
         ) : (
           <ul class="flex flex-col gap-3">
             {recent.map((order) => (
-              <li class="flex flex-col gap-0.5 border-b border-border pb-3">
+              <li class="flex flex-col gap-2 border-b border-border pb-3">
                 <p class="text-sm font-medium">{orderSummary(order)}</p>
                 <p class="text-sm text-muted-foreground">
                   {orderItemLines(order).join(", ")}
@@ -155,6 +202,28 @@ function orderSummary(order: OrderView) {
                   {" · "}
                   {order.buyerName}
                 </p>
+                <p class="text-sm text-muted-foreground">
+                  {paymentMethodLabel(order.paymentMethod)} ·{" "}
+                  {paymentStatusLabel(order.paymentStatus)}
+                </p>
+                {order.paymentStatus === "pending" ? (
+                  <p class="text-sm">
+                    Por cobrar {formatCordoba(order.totalPrice)}
+                  </p>
+                ) : null}
+                <form method="post">
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <button
+                    class={buttonVariants({ variant: "outline" })}
+                    type="submit"
+                    name="intent"
+                    value={order.paymentStatus === "paid" ? "unpay" : "pay"}
+                  >
+                    {order.paymentStatus === "paid"
+                      ? "Marcar sin pagar"
+                      : "Marcar pagado"}
+                  </button>
+                </form>
               </li>
             ))}
           </ul>

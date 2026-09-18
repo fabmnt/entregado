@@ -1,17 +1,28 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
 import type { Doc, Id } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
 import {
+  isBusinessSuspended,
   requireBusinessBySlug,
   requireManagedBusiness,
   requireRider,
 } from "./access"
 import { parseNicaraguaE164 } from "./phone"
 import { productSupportsDelivery } from "./products"
-import { fulfillmentMode, orderView } from "./schema"
+import {
+  fulfillmentMode,
+  orderView,
+  paymentMethod,
+  publicOrderView,
+} from "./schema"
 
 const ORDER_LIST_LIMIT = 100
+const RECENT_ORDER_LIMIT = 10
 const MAX_ITEM_QUANTITY = 99
 const MAX_ORDER_ITEMS = 50
 const BUYER_NAME_MAX = 80
@@ -57,6 +68,8 @@ async function toOrderView(ctx: QueryCtx | MutationCtx, doc: Doc<"orders">) {
     buyerLocation: doc.buyerLocation ?? null,
     fulfillment: doc.fulfillment,
     status: doc.status,
+    paymentMethod: doc.paymentMethod ?? null,
+    paymentStatus: doc.paymentStatus ?? "pending",
     riderName: doc.riderName ?? null,
     createdAt: new Date(doc._creationTime).toISOString(),
   }
@@ -91,11 +104,17 @@ function maskBuyerPhone(phone: string): string {
   return `**** ${last4}`
 }
 
-function toPublicOrderView(order: Awaited<ReturnType<typeof toOrderView>>) {
+async function toPublicOrderView(
+  ctx: QueryCtx | MutationCtx,
+  doc: Doc<"orders">
+) {
+  const order = await toOrderView(ctx, doc)
   return {
     ...order,
     buyerPhone: maskBuyerPhone(order.buyerPhone),
     buyerLocation: null,
+    completedAt: doc.completedAt ?? null,
+    cancelledAt: doc.cancelledAt ?? null,
   }
 }
 
@@ -149,33 +168,15 @@ async function resolveOrderItems(
   return items
 }
 
-async function listByFulfillmentAndStatus(
-  ctx: QueryCtx,
-  businessId: Id<"businesses">,
-  fulfillment: Doc<"orders">["fulfillment"],
-  status: Doc<"orders">["status"]
-) {
-  return await ctx.db
-    .query("orders")
-    .withIndex("by_businessId_and_fulfillment_and_status", (q) =>
-      q
-        .eq("businessId", businessId)
-        .eq("fulfillment", fulfillment)
-        .eq("status", status)
-    )
-    .order("desc")
-    .take(ORDER_LIST_LIMIT)
-}
-
 export const getPublic = query({
   args: { slug: v.string(), orderId: v.id("orders") },
-  returns: v.union(orderView, v.null()),
+  returns: v.union(publicOrderView, v.null()),
   handler: async (ctx, args) => {
     const business = await ctx.db
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    if (!business) {
+    if (!business || isBusinessSuspended(business)) {
       return null
     }
 
@@ -183,43 +184,39 @@ export const getPublic = query({
     if (!order || order.businessId !== business._id) {
       return null
     }
-    return toPublicOrderView(await toOrderView(ctx, order))
+    return await toPublicOrderView(ctx, order)
   },
 })
 
 export const listManaged = query({
-  args: { slug: v.string() },
+  args: { slug: v.string(), paginationOpts: paginationOptsValidator },
   returns: v.object({
-    open: v.array(orderView),
+    open: paginationResultValidator(orderView),
     recent: v.array(orderView),
   }),
   handler: async (ctx, args) => {
     const business = await requireManagedBusiness(ctx, args.slug)
-    const openRows = (
-      await Promise.all([
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "pending"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "pending"),
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "accepted"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "accepted"),
-      ])
-    )
-      .flat()
-      .sort((a, b) => b._creationTime - a._creationTime)
+    const openResult = await ctx.db
+      .query("orders")
+      .withIndex("by_businessId_and_open", (q) =>
+        q.eq("businessId", business._id).eq("open", true)
+      )
+      .order("desc")
+      .paginate(args.paginationOpts)
 
-    const recentRows = (
-      await Promise.all([
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "completed"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "completed"),
-        listByFulfillmentAndStatus(ctx, business._id, "delivery", "cancelled"),
-        listByFulfillmentAndStatus(ctx, business._id, "pickup", "cancelled"),
-      ])
-    )
-      .flat()
-      .sort((a, b) => b._creationTime - a._creationTime)
-      .slice(0, ORDER_LIST_LIMIT)
+    const recentRows = await ctx.db
+      .query("orders")
+      .withIndex("by_businessId_and_open", (q) =>
+        q.eq("businessId", business._id).eq("open", false)
+      )
+      .order("desc")
+      .take(RECENT_ORDER_LIMIT)
 
     return {
-      open: await listOrderViews(ctx, openRows),
+      open: {
+        ...openResult,
+        page: await listOrderViews(ctx, openResult.page),
+      },
       recent: await listOrderViews(ctx, recentRows),
     }
   },
@@ -271,10 +268,14 @@ export const create = mutation({
     buyerPhone: v.string(),
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
+    paymentMethod: paymentMethod,
   },
   returns: orderView,
   handler: async (ctx, args) => {
     const business = await requireBusinessBySlug(ctx, args.slug)
+    if (isBusinessSuspended(business)) {
+      throw new ConvexError("NOT_FOUND")
+    }
 
     const buyerName = args.buyerName.trim()
     if (buyerName.length === 0 || buyerName.length > BUYER_NAME_MAX) {
@@ -309,7 +310,10 @@ export const create = mutation({
       ...(wantsDelivery && buyerLocation ? { buyerLocation } : {}),
       fulfillment: wantsDelivery ? "delivery" : "pickup",
       status: "pending",
+      open: true,
       totalPrice,
+      paymentMethod: args.paymentMethod,
+      paymentStatus: "pending",
     })
     for (const item of items) {
       await ctx.db.insert("orderItems", { orderId: id, ...item })
@@ -346,7 +350,8 @@ export const accept = mutation({
       throw new ConvexError("HAS_ACTIVE_ORDER")
     }
 
-    const riderName = user.name.trim() || rider.name || user.email
+    // The owner edits the rider name in the panel, so prefer that profile name.
+    const riderName = rider.name?.trim() || user.name.trim() || user.email
     await ctx.db.patch("orders", order._id, {
       status: "accepted",
       riderUserId: rider._id,
@@ -375,6 +380,7 @@ export const completeAsRider = mutation({
 
     await ctx.db.patch("orders", order._id, {
       status: "completed",
+      open: false,
       completedAt: Date.now(),
     })
     const row = await ctx.db.get("orders", order._id)
@@ -401,6 +407,7 @@ export const completeAsOwner = mutation({
 
     await ctx.db.patch("orders", order._id, {
       status: "completed",
+      open: false,
       completedAt: Date.now(),
     })
     const row = await ctx.db.get("orders", order._id)
@@ -424,7 +431,34 @@ export const cancelAsOwner = mutation({
 
     await ctx.db.patch("orders", order._id, {
       status: "cancelled",
+      open: false,
       cancelledAt: Date.now(),
+    })
+    const row = await ctx.db.get("orders", order._id)
+    if (!row) {
+      throw new Error("Update did not persist the order")
+    }
+    return await toOrderView(ctx, row)
+  },
+})
+
+export const setPaidAsOwner = mutation({
+  args: {
+    slug: v.string(),
+    orderId: v.id("orders"),
+    paid: v.boolean(),
+  },
+  returns: orderView,
+  handler: async (ctx, args) => {
+    const business = await requireManagedBusiness(ctx, args.slug)
+    const order = await ctx.db.get("orders", args.orderId)
+    if (!order || order.businessId !== business._id) {
+      throw new ConvexError("NOT_FOUND")
+    }
+
+    await ctx.db.patch("orders", order._id, {
+      paymentStatus: args.paid ? "paid" : "pending",
+      paidAt: args.paid ? Date.now() : undefined,
     })
     const row = await ctx.db.get("orders", order._id)
     if (!row) {

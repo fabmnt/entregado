@@ -1,7 +1,11 @@
 ---
 import AdminNav from "../../../components/admin-nav.astro"
 import Layout from "../../../layouts/main.astro"
-import { getManagedBusiness } from "../../../lib/businesses"
+import {
+  getManagedBusiness,
+  isBusinessSuspended,
+  suspensionLabel,
+} from "../../../lib/businesses"
 
 const slug = Astro.params.slug
 const token = Astro.locals.convexToken
@@ -19,6 +23,23 @@ if (!business) {
 <Layout title={`${business.name} | Panel`}>
   <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
     <AdminNav slug={business.slug} name={business.name} current="home" />
+    {
+      isBusinessSuspended(business) ? (
+        <section
+          class="flex flex-col gap-1 border border-destructive/40 p-4"
+          role="status"
+        >
+          <p class="text-sm font-medium text-destructive">Negocio suspendido</p>
+          <p class="text-sm text-muted-foreground">
+            {suspensionLabel(business)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            La tienda no aparece en el directorio y no recibe pedidos nuevos. Un
+            admin general puede reactivarla.
+          </p>
+        </section>
+      ) : null
+    }
     <ul class="flex flex-col gap-3">
       <li>
         <a

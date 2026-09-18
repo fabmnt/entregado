@@ -71,6 +71,7 @@ let formValues = {
   buyerName: "",
   buyerPhone: "",
   fulfillment: canDeliver ? "delivery" : "pickup",
+  paymentMethod: "cash_on_delivery",
   buyerLocation: "",
 }
 let fieldErrors: CheckoutFieldErrors = {}
@@ -116,6 +117,7 @@ if (Astro.request.method === "POST") {
       fulfillment: canDeliver
         ? String(form.get("fulfillment") ?? "pickup")
         : "pickup",
+      paymentMethod: String(form.get("paymentMethod") ?? "cash_on_delivery"),
       buyerLocation: String(form.get("buyerLocation") ?? ""),
     }
 
@@ -124,7 +126,12 @@ if (Astro.request.method === "POST") {
       formError = "Revisa los datos del pedido"
       fieldErrors = fieldErrorsFromZod(parsed.error)
     } else {
-      const result = await createOrder(slug, cart, parsed.data)
+      const checkoutItems = lines.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+      }))
+      writeCart(Astro.cookies, slug, checkoutItems)
+      const result = await createOrder(slug, checkoutItems, parsed.data)
       if (result.ok) {
         clearCart(Astro.cookies, slug)
         return Astro.redirect(`/${slug}/order/${result.order.id}`, 303)
@@ -370,6 +377,40 @@ if (Astro.request.method === "POST") {
                 ) : null}
               </Field>
             ) : null}
+            <Field data-invalid={fieldErrors.paymentMethod ? true : undefined}>
+              <FieldLabel htmlFor="paymentMethod">
+                ¿Cómo vas a pagar?
+              </FieldLabel>
+              <NativeSelect
+                id="paymentMethod"
+                name="paymentMethod"
+                className="w-full"
+                defaultValue={formValues.paymentMethod}
+                required
+                aria-invalid={fieldErrors.paymentMethod ? true : undefined}
+                aria-describedby={
+                  fieldErrors.paymentMethod ? "payment-method-error" : undefined
+                }
+              >
+                <NativeSelectOption value="cash_on_delivery">
+                  Efectivo al entregar
+                </NativeSelectOption>
+                <NativeSelectOption value="transfer">
+                  Transferencia
+                </NativeSelectOption>
+              </NativeSelect>
+              <FieldDescription
+                id="transfer-note"
+                hidden={formValues.paymentMethod !== "transfer"}
+              >
+                Si pagas por transferencia, el negocio coordina el pago contigo.
+              </FieldDescription>
+              {fieldErrors.paymentMethod ? (
+                <FieldError id="payment-method-error">
+                  {fieldErrors.paymentMethod}
+                </FieldError>
+              ) : null}
+            </Field>
           </FieldGroup>
           <button
             class={buttonVariants()}
@@ -401,5 +442,18 @@ if (Astro.request.method === "POST") {
     }
     select.addEventListener("change", syncLocation)
     syncLocation()
+  }
+
+  const paymentSelect = document.getElementById("paymentMethod")
+  const transferNote = document.getElementById("transfer-note")
+  if (
+    paymentSelect instanceof HTMLSelectElement &&
+    transferNote instanceof HTMLElement
+  ) {
+    const syncTransferNote = () => {
+      transferNote.hidden = paymentSelect.value !== "transfer"
+    }
+    paymentSelect.addEventListener("change", syncTransferNote)
+    syncTransferNote()
   }
 </script>

@@ -21,6 +21,11 @@ export const fulfillmentMode = v.union(
   v.literal("delivery"),
   v.literal("pickup")
 )
+export const paymentMethod = v.union(
+  v.literal("cash_on_delivery"),
+  v.literal("transfer")
+)
+export const paymentStatus = v.union(v.literal("pending"), v.literal("paid"))
 
 export const businessFields = v.object({
   slug: v.string(),
@@ -36,6 +41,8 @@ export const businessFields = v.object({
   hours: v.optional(v.string()),
   logoStorageId: v.optional(v.id("_storage")),
   ownerTokenIdentifier: v.optional(v.string()),
+  suspendedAt: v.optional(v.number()),
+  suspensionReason: v.optional(v.string()),
 })
 
 export const directoryBusiness = v.object({
@@ -56,6 +63,8 @@ export const managedBusiness = directoryBusiness.extend({
   phone: v.optional(v.string()),
   address: v.optional(v.string()),
   hours: v.optional(v.string()),
+  suspendedAt: v.union(v.number(), v.null()),
+  suspensionReason: v.union(v.string(), v.null()),
 })
 
 export const storeProduct = v.object({
@@ -102,14 +111,24 @@ export const orderView = v.object({
   buyerLocation: v.union(v.string(), v.null()),
   fulfillment: fulfillmentMode,
   status: orderStatus,
+  paymentMethod: v.union(paymentMethod, v.null()),
+  paymentStatus: paymentStatus,
   riderName: v.union(v.string(), v.null()),
   createdAt: v.string(),
+})
+
+// Buyer-facing receipt view. Adds the close-out timestamps the tracking page
+// needs; PII stays masked by the query that returns it.
+export const publicOrderView = orderView.extend({
+  completedAt: v.union(v.number(), v.null()),
+  cancelledAt: v.union(v.number(), v.null()),
 })
 
 export const riderView = v.object({
   id: v.id("users"),
   name: v.string(),
   email: v.string(),
+  active: v.boolean(),
 })
 
 export default defineSchema({
@@ -119,14 +138,18 @@ export default defineSchema({
     businessId: v.optional(v.id("businesses")),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
+    // Riders created before this flag existed have no value and count as active.
+    active: v.optional(v.boolean()),
   })
     .index("by_auth_user", ["authUserId"])
     .index("by_kind", ["kind"])
-    .index("by_businessId", ["businessId"]),
+    .index("by_businessId", ["businessId"])
+    .index("by_businessId_and_kind", ["businessId", "kind"]),
   businesses: defineTable(businessFields)
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerTokenIdentifier"])
-    .index("by_logoStorageId", ["logoStorageId"]),
+    .index("by_logoStorageId", ["logoStorageId"])
+    .index("by_suspendedAt", ["suspendedAt"]),
   products: defineTable(productFields)
     .index("by_businessId", ["businessId"])
     .index("by_businessId_and_available", ["businessId", "available"])
@@ -138,13 +161,18 @@ export default defineSchema({
     buyerLocation: v.optional(v.string()),
     fulfillment: fulfillmentMode,
     status: orderStatus,
+    open: v.boolean(),
     totalPrice: v.number(),
+    paymentMethod: v.optional(paymentMethod),
+    paymentStatus: v.optional(paymentStatus),
+    paidAt: v.optional(v.number()),
     riderUserId: v.optional(v.id("users")),
     riderName: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     cancelledAt: v.optional(v.number()),
   })
     .index("by_businessId", ["businessId"])
+    .index("by_businessId_and_open", ["businessId", "open"])
     .index("by_businessId_and_fulfillment_and_status", [
       "businessId",
       "fulfillment",

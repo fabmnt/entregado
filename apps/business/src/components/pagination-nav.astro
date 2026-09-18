@@ -1,0 +1,42 @@
+---
+interface Props {
+  basePath: string
+  cursor: string | null
+  isDone: boolean
+  continueCursor: string
+}
+
+const { basePath, cursor, isDone, continueCursor } = Astro.props
+const hasPrevious = cursor !== null
+const hasNext = !isDone
+---
+
+{
+  hasPrevious || hasNext ? (
+    <nav
+      class="flex items-center justify-between gap-4 text-sm"
+      aria-label="Paginación"
+    >
+      {hasPrevious ? (
+        <a
+          href={basePath}
+          class="font-medium underline-offset-4 hover:underline"
+        >
+          Anterior
+        </a>
+      ) : (
+        <span />
+      )}
+      {hasNext ? (
+        <a
+          href={`${basePath}?cursor=${encodeURIComponent(continueCursor)}`}
+          class="font-medium underline-offset-4 hover:underline"
+        >
+          Siguiente
+        </a>
+      ) : (
+        <span />
+      )}
+    </nav>
+  ) : null
+}

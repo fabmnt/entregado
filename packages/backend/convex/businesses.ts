@@ -1,8 +1,18 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server"
 import { ConvexError, v } from "convex/values"
 import type { Doc } from "./_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { mutation, query } from "./_generated/server"
-import { isBusinessManagerKind, requireManagedBusiness } from "./access"
+import {
+  isBusinessManagerKind,
+  isBusinessSuspended,
+  requireAdmin,
+  requireBusinessBySlug,
+  requireManagedBusiness,
+} from "./access"
 import { deleteStorageIfUnreferenced } from "./files"
 import { requireSignedInUser } from "./identity"
 import { parseNicaraguaE164 } from "./phone"
@@ -14,7 +24,8 @@ import {
   storefront,
 } from "./schema"
 
-const DIRECTORY_LIST_LIMIT = 100
+const SUSPENSION_REASON_MAX = 200
+const STOREFRONT_PRODUCT_LIMIT = 100
 const RESERVED_SLUGS = new Set([
   "login",
   "register",
@@ -90,6 +101,8 @@ async function toManagedBusiness(
     phone: doc.phone,
     address: doc.address,
     hours: doc.hours,
+    suspendedAt: doc.suspendedAt ?? null,
+    suspensionReason: doc.suspensionReason ?? null,
   }
 }
 
@@ -99,14 +112,20 @@ function optionalText(value: string): string | undefined {
 }
 
 export const list = query({
-  args: {},
-  returns: v.array(directoryBusiness),
-  handler: async (ctx) => {
-    const rows = await ctx.db
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(directoryBusiness),
+  handler: async (ctx, args) => {
+    const result = await ctx.db
       .query("businesses")
+      .withIndex("by_suspendedAt", (q) => q.eq("suspendedAt", undefined))
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
-    return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+      .paginate(args.paginationOpts)
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toDirectoryBusiness(ctx, row))
+      ),
+    }
   },
 })
 
@@ -118,7 +137,10 @@ export const getBySlug = query({
       .query("businesses")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
-    return row ? await toDirectoryBusiness(ctx, row) : null
+    if (!row || isBusinessSuspended(row)) {
+      return null
+    }
+    return await toDirectoryBusiness(ctx, row)
   },
 })
 
@@ -131,7 +153,7 @@ export const getStoreBySlug = query({
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique()
 
-    if (!business) {
+    if (!business || isBusinessSuspended(business)) {
       return null
     }
 
@@ -141,7 +163,7 @@ export const getStoreBySlug = query({
         q.eq("businessId", business._id).eq("available", true)
       )
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
+      .take(STOREFRONT_PRODUCT_LIMIT)
 
     const products = await Promise.all(
       productRows.map((product) => toStoreProduct(ctx, product))
@@ -155,30 +177,60 @@ export const getStoreBySlug = query({
 })
 
 export const listForSignedIn = query({
-  args: {},
-  returns: v.array(directoryBusiness),
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(directoryBusiness),
+  handler: async (ctx, args) => {
     const user = await requireSignedInUser(ctx)
     if (!isBusinessManagerKind(user.kind)) {
       throw new ConvexError("FORBIDDEN")
     }
 
     if (user.kind === "admin") {
-      const rows = await ctx.db
+      const result = await ctx.db
         .query("businesses")
         .order("desc")
-        .take(DIRECTORY_LIST_LIMIT)
-      return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+        .paginate(args.paginationOpts)
+      return {
+        ...result,
+        page: await Promise.all(
+          result.page.map((row) => toDirectoryBusiness(ctx, row))
+        ),
+      }
     }
 
-    const rows = await ctx.db
+    const result = await ctx.db
       .query("businesses")
       .withIndex("by_owner", (q) =>
         q.eq("ownerTokenIdentifier", user.tokenIdentifier)
       )
       .order("desc")
-      .take(DIRECTORY_LIST_LIMIT)
-    return await Promise.all(rows.map((row) => toDirectoryBusiness(ctx, row)))
+      .paginate(args.paginationOpts)
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toDirectoryBusiness(ctx, row))
+      ),
+    }
+  },
+})
+
+export const listAllForAdmin = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(managedBusiness),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+
+    const result = await ctx.db
+      .query("businesses")
+      .order("desc")
+      .paginate(args.paginationOpts)
+
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((row) => toManagedBusiness(ctx, row))
+      ),
+    }
   },
 })
 
@@ -283,6 +335,14 @@ export const updateProfile = mutation({
       ...(hours ? { hours } : {}),
       ...(nextLogo ? { logoStorageId: nextLogo } : {}),
       ownerTokenIdentifier: business.ownerTokenIdentifier,
+      // replace() drops fields it does not list, so the admin suspension
+      // state must be carried over explicitly.
+      ...(business.suspendedAt !== undefined
+        ? { suspendedAt: business.suspendedAt }
+        : {}),
+      ...(business.suspensionReason !== undefined
+        ? { suspensionReason: business.suspensionReason }
+        : {}),
     })
 
     const row = await ctx.db.get("businesses", business._id)
@@ -293,5 +353,39 @@ export const updateProfile = mutation({
       await deleteStorageIfUnreferenced(ctx, previousLogoToDelete)
     }
     return await toManagedBusiness(ctx, row)
+  },
+})
+
+export const suspend = mutation({
+  args: { slug: v.string(), reason: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+    const business = await requireBusinessBySlug(ctx, args.slug)
+    const reason = args.reason.trim()
+    if (reason.length === 0 || reason.length > SUSPENSION_REASON_MAX) {
+      throw new ConvexError("INVALID_REASON")
+    }
+
+    await ctx.db.patch("businesses", business._id, {
+      suspendedAt: Date.now(),
+      suspensionReason: reason,
+    })
+    return null
+  },
+})
+
+export const reactivate = mutation({
+  args: { slug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+    const business = await requireBusinessBySlug(ctx, args.slug)
+
+    await ctx.db.patch("businesses", business._id, {
+      suspendedAt: undefined,
+      suspensionReason: undefined,
+    })
+    return null
   },
 })

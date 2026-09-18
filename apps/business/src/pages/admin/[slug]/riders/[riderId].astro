@@ -1,0 +1,163 @@
+---
+import type { Id } from "@entregado/backend"
+import { buttonVariants } from "@workspace/ui/components/button"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
+import { Input } from "@workspace/ui/components/input"
+import AdminNav from "../../../../components/admin-nav.astro"
+import Layout from "../../../../layouts/main.astro"
+import { getManagedBusiness } from "../../../../lib/businesses"
+import {
+  getManagedRider,
+  setRiderActive,
+  updateRiderName,
+  type RiderFieldErrors,
+} from "../../../../lib/riders"
+
+const slug = Astro.params.slug
+const riderIdParam = Astro.params.riderId
+const token = Astro.locals.convexToken
+
+if (!slug || !riderIdParam || !token) {
+  return new Response(null, { status: 404 })
+}
+
+const riderId = riderIdParam as Id<"users">
+const business = await getManagedBusiness(slug, token)
+if (!business) {
+  return new Response(null, { status: 404 })
+}
+
+let rider: Awaited<ReturnType<typeof getManagedRider>>
+try {
+  rider = await getManagedRider(slug, riderId, token)
+} catch {
+  return new Response(null, { status: 404 })
+}
+if (!rider) {
+  return new Response(null, { status: 404 })
+}
+
+let nameValue = rider.name
+let fieldErrors: RiderFieldErrors = {}
+let formError = ""
+let statusError = ""
+let saved = false
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData()
+  const intent = String(form.get("intent") ?? "save")
+
+  if (intent === "activate" || intent === "deactivate") {
+    const result = await setRiderActive(
+      slug,
+      riderId,
+      intent === "activate",
+      token
+    )
+    if (result.ok) {
+      return Astro.redirect(`/admin/${slug}/riders`, 303)
+    }
+    statusError = result.error
+  } else {
+    nameValue = String(form.get("name") ?? "")
+    const result = await updateRiderName(
+      slug,
+      riderId,
+      { name: nameValue },
+      token
+    )
+    if (result.ok) {
+      rider = result.rider
+      saved = true
+    } else {
+      formError = result.error
+      fieldErrors = result.fieldErrors
+    }
+  }
+}
+---
+
+<Layout title={`${rider.name} | ${business.name}`}>
+  <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-8 p-6">
+    <AdminNav slug={business.slug} name={business.name} current="riders" />
+    <header class="flex flex-col gap-1">
+      <h2 class="text-sm font-medium">{rider.name}</h2>
+      <p class="text-sm text-muted-foreground">{rider.email}</p>
+      <p
+        class:list={[
+          "text-sm",
+          rider.active ? "text-muted-foreground" : "text-destructive",
+        ]}
+      >
+        {rider.active ? "Activo" : "Desactivado"}
+      </p>
+    </header>
+
+    <form method="post" class="flex flex-col gap-5">
+      {
+        formError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : saved ? (
+          <p class="text-sm text-muted-foreground" role="status">
+            Guardado.
+          </p>
+        ) : null
+      }
+      <FieldGroup>
+        <Field data-invalid={fieldErrors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input
+            id="name"
+            name="name"
+            autoComplete="name"
+            defaultValue={nameValue}
+            required
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "name-error" : undefined}
+          />
+          {
+            fieldErrors.name ? (
+              <FieldError id="name-error">{fieldErrors.name}</FieldError>
+            ) : null
+          }
+        </Field>
+      </FieldGroup>
+      <button class={buttonVariants()} type="submit" name="intent" value="save">
+        Guardar
+      </button>
+    </form>
+
+    <form method="post" class="flex flex-col gap-3">
+      {
+        statusError ? (
+          <p class="text-sm text-destructive" role="alert">
+            {statusError}
+          </p>
+        ) : null
+      }
+      <button
+        class={buttonVariants({
+          variant: rider.active ? "destructive" : "outline",
+        })}
+        type="submit"
+        name="intent"
+        value={rider.active ? "deactivate" : "activate"}
+        onclick={rider.active
+          ? "return window.confirm('¿Desactivar a este repartidor? No podrá tomar entregas.')"
+          : undefined}
+      >
+        {rider.active ? "Desactivar repartidor" : "Reactivar repartidor"}
+      </button>
+      <p class="text-sm text-muted-foreground">
+        Un repartidor desactivado no puede entrar a su tablero de entregas.
+      </p>
+    </form>
+  </main>
+</Layout>

@@ -6,7 +6,9 @@ import BusinessCard from "../components/business-card.astro"
 import { listBusinesses } from "../lib/businesses"
 import { HERO_IMAGE } from "../lib/directory"
 
-const businesses = await listBusinesses()
+const cursor = Astro.url.searchParams.get("cursor")
+const businesses = await listBusinesses(cursor)
+const businessesNextHref = `?cursor=${encodeURIComponent(businesses.continueCursor)}#businesses`
 
 const advantages = [
   {
@@ -119,17 +121,47 @@ const advantages = [
         </div>
 
         {
-          businesses.length === 0 ? (
+          businesses.page.length === 0 ? (
             <p class="max-w-md text-sm leading-relaxed text-muted-foreground">
               Todavía no hay negocios con su tienda publicada.
             </p>
           ) : (
             <div class="grid gap-x-16 gap-y-24 md:grid-cols-2">
-              {businesses.map((business) => (
+              {businesses.page.map((business) => (
                 <BusinessCard business={business} />
               ))}
             </div>
           )
+        }
+
+        {
+          cursor !== null || !businesses.isDone ? (
+            <nav
+              class="mt-16 flex items-center justify-between gap-4 border-t border-border pt-6 md:mt-24"
+              aria-label="Paginación de negocios"
+            >
+              {cursor !== null ? (
+                <a
+                  href="/#businesses"
+                  class="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  Anterior
+                </a>
+              ) : (
+                <span />
+              )}
+              {businesses.isDone ? (
+                <span />
+              ) : (
+                <a
+                  href={businessesNextHref}
+                  class="text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  Siguiente
+                </a>
+              )}
+            </nav>
+          ) : null
         }
       </section>
     </main>
