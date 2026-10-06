@@ -1,0 +1,102 @@
+@import "@workspace/ui/globals.css";
+@import "@fontsource-variable/bodoni-moda";
+
+/* Directory palette. Only the web app uses it; the business app keeps the
+   shared neutral tokens. */
+@theme inline {
+  --font-display: "Bodoni Moda Variable", serif;
+  --color-brass: var(--brass);
+  --color-sage: var(--sage);
+  --color-butter: var(--butter);
+  --color-blush: var(--blush);
+  --color-mint: var(--mint);
+}
+
+:root {
+  --background: #fbfaf6;
+  --foreground: #14261f;
+  --card: #fbfaf6;
+  --card-foreground: #14261f;
+  --primary: #17402f;
+  --primary-foreground: #fbfaf6;
+  --muted: #eef0e8;
+  --muted-foreground: #56645d;
+  --border: #dfe3d8;
+  --ring: #17402f;
+  --brass: #b98a2f;
+  --sage: #e5ede0;
+  --butter: #f6e7a9;
+  --blush: #f5dcd2;
+  --mint: #d6eadf;
+}
+
+/* The single page-load moment: the hero photo settles into its frame. */
+@keyframes hero-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+.hero-photo {
+  animation: hero-settle 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* The header condenses into a solid bar during the first scroll distance.
+   Pure CSS and tied to the user's own scrolling. Browsers without scroll
+   timelines always show the solid bar. Only paint and transform properties
+   change: a height change would move the page and make the browser shift the
+   scroll position while the reader scrolls. */
+.site-header {
+  background-color: rgb(251 250 246 / 0.92);
+  border-bottom: 1px solid var(--border);
+}
+
+@keyframes header-condense {
+  to {
+    background-color: rgb(251 250 246 / 0.92);
+    border-bottom-color: var(--border);
+    box-shadow: 0 10px 30px -18px rgb(20 38 31 / 0.35);
+  }
+}
+
+@keyframes wordmark-condense {
+  to {
+    transform: scale(0.8);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .site-header {
+    background-color: transparent;
+    border-bottom-color: transparent;
+    animation: header-condense linear both;
+    animation-timeline: scroll();
+    animation-range: 0 140px;
+  }
+
+  .site-wordmark {
+    transform-origin: left center;
+    animation: wordmark-condense linear both;
+    animation-timeline: scroll();
+    animation-range: 0 140px;
+  }
+}
+
+/* Sunlight rays turn slowly around the hero sun. */
+@keyframes sun-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.sun-rays {
+  animation: sun-spin 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-photo,
+  .sun-rays {
+    animation: none;
+  }
+}

@@ -3,169 +3,243 @@ import Layout from "../layouts/main.astro"
 import SiteHeader from "../components/site-header.astro"
 import SiteFooter from "../components/site-footer.astro"
 import BusinessCard from "../components/business-card.astro"
-import { listBusinesses } from "../lib/businesses"
+import { getBusinessAppUrl, listBusinesses } from "../lib/businesses"
 import { HERO_IMAGE } from "../lib/directory"
 
-const cursor = Astro.url.searchParams.get("cursor")
-const businesses = await listBusinesses(cursor)
-const businessesNextHref = `?cursor=${encodeURIComponent(businesses.continueCursor)}#businesses`
+// The landing page only highlights a few businesses, with no "show more".
+const LANDING_BUSINESS_COUNT = 9
 
-const advantages = [
+const businesses = await listBusinesses(null, LANDING_BUSINESS_COUNT)
+const businessAppUrl = getBusinessAppUrl()
+
+const steps = [
   {
-    title: "Una tienda por negocio",
-    body: "Cada local recibe su propia app de ventas y pedidos. El catálogo vive ahí, no en un listado compartido.",
+    title: "Elige un negocio",
+    body: "Restaurantes, panaderías y farmacias, cada uno con su propia tienda.",
   },
   {
-    title: "El pedido llega al negocio",
-    body: "El cliente pide en la web del local. Ellos aceptan, preparan y despachan.",
+    title: "Pide en su tienda",
+    body: "Ves su catálogo, sus precios y su horario. El pedido llega directo al negocio.",
   },
   {
-    title: "Ellos ponen las reglas",
-    body: "Horario, zona y qué venden lo decide cada negocio. Entregado no opera un marketplace.",
+    title: "Recíbelo en casa",
+    body: "El negocio prepara tu pedido y te lo entrega, o lo pasas a recoger.",
   },
 ] as const
+
+// Triangles around the hero sun. The rays SVG is 1.5 times the sun, so the
+// sun edge sits at radius 66 of its 200 unit view box.
+const SUN_RAY_COUNT = 12
+const SUN_RAY_BASE_RADIUS = 71
+const SUN_RAY_TIP_RADIUS = 85
+const SUN_RAY_HALF_WIDTH = Math.PI / 48
+
+function polarPoint(radius: number, angle: number): string {
+  return `${(radius * Math.cos(angle)).toFixed(2)},${(radius * Math.sin(angle)).toFixed(2)}`
+}
+
+const sunRays = Array.from({ length: SUN_RAY_COUNT }, (_, index) => {
+  const angle = (index / SUN_RAY_COUNT) * 2 * Math.PI
+  return [
+    polarPoint(SUN_RAY_BASE_RADIUS, angle - SUN_RAY_HALF_WIDTH),
+    polarPoint(SUN_RAY_TIP_RADIUS, angle),
+    polarPoint(SUN_RAY_BASE_RADIUS, angle + SUN_RAY_HALF_WIDTH),
+  ].join(" ")
+})
+const focusRing =
+  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background focus-visible:outline-none"
 ---
 
 <Layout
   title="Entregado | Una tienda propia para cada negocio"
-  description="Entregado da a cada negocio su propia app de ventas y pedidos. Acá ves quiénes ya tienen la suya."
+  description="Restaurantes, panaderías y farmacias con su propia tienda en línea. Elige un negocio y pide directo."
 >
-  <div class="flex min-h-svh flex-col">
-    <SiteHeader />
+  <SiteHeader />
 
-    <main class="flex-1">
-      <section
-        class="grid lg:min-h-[calc(100svh-5.5rem)] lg:grid-cols-2"
-        aria-labelledby="hero-heading"
+  <main>
+    <section
+      class="mx-auto w-full max-w-7xl px-3 pt-2 md:px-6"
+      aria-labelledby="hero-heading"
+    >
+      <div
+        class="bg-sage grid gap-14 overflow-hidden rounded-[2.5rem] px-5 pt-12 pb-14 md:px-12 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-16 lg:px-16 lg:py-20"
       >
+        <div class="flex flex-col gap-8 md:gap-10">
+          <h1
+            id="hero-heading"
+            class="font-display text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.025em] text-balance text-primary sm:text-6xl lg:text-[4.6rem]"
+          >
+            Los negocios que te gustan, a la puerta de tu casa.
+          </h1>
+          <p
+            class="max-w-md text-lg leading-relaxed text-pretty text-foreground/75"
+          >
+            Restaurantes, panaderías y farmacias con su propia tienda en línea.
+            Eliges, pides y el negocio te lo entrega.
+          </p>
+          <div class="flex flex-wrap items-center gap-x-8 gap-y-5">
+            <a
+              href="#businesses"
+              class:list={[
+                "inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground shadow-[0_12px_30px_-12px_rgb(23_64_47/0.6)] transition-colors hover:bg-primary/90",
+                focusRing,
+              ]}
+            >
+              Ver negocios
+            </a>
+            <a
+              href="#owners"
+              class:list={[
+                "decoration-brass inline-block py-3 text-sm text-foreground/75 underline decoration-2 underline-offset-[6px] transition-colors hover:text-foreground",
+                focusRing,
+              ]}
+            >
+              ¿Tienes un negocio?
+            </a>
+          </div>
+        </div>
+
         <div
-          class="flex flex-col justify-center gap-8 px-6 py-12 md:px-12 lg:px-16 lg:py-16"
+          class="relative mx-auto mt-6 w-full max-w-[17rem] sm:mt-0 sm:max-w-md"
         >
-          <div class="flex max-w-xl flex-col gap-6">
-            <h1
-              id="hero-heading"
-              class="font-serif text-5xl leading-[0.95] font-medium md:text-6xl"
+          <div
+            class="absolute -top-6 -right-6 size-36 sm:-top-8 sm:-right-10 sm:size-56 md:size-72"
+            aria-hidden="true"
+          >
+            <svg
+              viewBox="-100 -100 200 200"
+              class="sun-rays fill-butter absolute -inset-1/4"
             >
-              Cada negocio,
-              <br />
-              su propia tienda.
-            </h1>
-            <p
-              class="max-w-md text-sm leading-relaxed text-muted-foreground md:text-base"
+              {sunRays.map((points) => <polygon points={points} />)}
+            </svg>
+            <div class="bg-butter absolute inset-0 rounded-full"></div>
+          </div>
+          <div
+            class="border-brass/70 pointer-events-none absolute -inset-x-3 -top-3 -bottom-3 rounded-t-full border-2"
+            aria-hidden="true"
+          >
+          </div>
+          <div class="relative overflow-hidden rounded-t-full bg-muted">
+            <img
+              src={HERO_IMAGE}
+              alt="Interior luminoso de una cafetería con ventanales en arco"
+              width="1200"
+              height="1500"
+              fetchpriority="high"
+              class="hero-photo aspect-[4/5] w-full object-cover"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      id="businesses"
+      class="mx-auto w-full max-w-7xl scroll-mt-24 px-5 pt-16 pb-24 md:px-10 md:pt-20 md:pb-32"
+      aria-labelledby="businesses-heading"
+    >
+      <h2 id="businesses-heading" class="sr-only">Negocios</h2>
+
+      {
+        businesses.page.length === 0 ? (
+          <p class="max-w-md text-sm leading-relaxed text-muted-foreground">
+            Todavía no hay negocios con su tienda publicada.
+          </p>
+        ) : (
+          <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            {businesses.page.map((business) => (
+              <BusinessCard business={business} />
+            ))}
+          </div>
+        )
+      }
+    </section>
+
+    <section
+      class="bg-primary text-primary-foreground"
+      aria-labelledby="steps-heading"
+    >
+      <div class="mx-auto w-full max-w-7xl px-5 py-20 md:px-10 md:py-28">
+        <div
+          class="border-brass/70 rounded-t-[10rem] border-4 border-double px-6 pt-16 pb-12 md:rounded-t-[16rem] md:px-14 md:pt-24 md:pb-16"
+        >
+          <div class="flex flex-col items-center gap-5 text-center">
+            <h2
+              id="steps-heading"
+              class="font-display text-4xl font-semibold tracking-[-0.02em] md:text-6xl"
             >
-              Entregado le da a cada negocio una app de ventas y pedidos. El
-              catálogo, los pedidos y las entregas se atienden en su web, no en
-              un marketplace.
-            </p>
+              Cómo pedir
+            </h2>
+            <div class="flex items-center gap-3" aria-hidden="true">
+              <span class="bg-brass h-px w-12"></span>
+              <span class="bg-brass size-2 rotate-45"></span>
+              <span class="bg-brass h-px w-12"></span>
+            </div>
           </div>
 
-          <a
-            href="#businesses"
-            class="inline-flex w-fit items-center justify-center rounded-full bg-primary px-7 py-3 text-sm text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:outline-none"
+          <ol
+            class="md:divide-brass/40 mt-14 grid gap-12 md:mt-20 md:grid-cols-3 md:gap-0 md:divide-x"
           >
-            Ver negocios
-          </a>
+            {
+              steps.map((step, index) => (
+                <li class="flex flex-col items-center gap-4 text-center md:px-8">
+                  <span
+                    class="font-display text-brass text-7xl leading-none font-medium italic lining-nums md:text-8xl"
+                    aria-hidden="true"
+                  >
+                    {index + 1}
+                  </span>
+                  <h3 class="font-display text-2xl font-semibold">
+                    {step.title}
+                  </h3>
+                  <p class="max-w-xs text-sm leading-relaxed text-primary-foreground/75">
+                    {step.body}
+                  </p>
+                </li>
+              ))
+            }
+          </ol>
         </div>
+      </div>
+    </section>
 
-        <div class="relative min-h-[50vh] bg-muted lg:min-h-full">
-          <img
-            src={HERO_IMAGE}
-            alt="Mesa servida en un negocio"
-            width="1600"
-            height="2000"
-            class="h-full w-full object-cover"
-          />
-          <aside
-            class="absolute right-5 bottom-5 max-w-60 bg-background/85 p-5 backdrop-blur-sm md:right-8 md:bottom-8"
-          >
-            <p class="font-serif text-xl leading-snug">
-              Una app propia para vender y tomar pedidos.
-            </p>
-          </aside>
-        </div>
-      </section>
-
-      <section
-        class="px-6 py-16 md:px-12 md:py-20 lg:px-16"
-        aria-label="Qué es"
+    <section
+      id="owners"
+      class="bg-butter scroll-mt-24 text-primary"
+      aria-labelledby="owners-heading"
+    >
+      <div
+        class="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-28 md:px-10 md:py-40 lg:flex-row lg:items-end lg:justify-between lg:py-48"
       >
-        <ul class="grid gap-12 md:grid-cols-3 md:gap-16">
-          {
-            advantages.map((item) => (
-              <li class="flex max-w-xs flex-col gap-3">
-                <p class="font-serif text-2xl font-medium">{item.title}</p>
-                <p class="text-sm leading-relaxed text-muted-foreground">
-                  {item.body}
-                </p>
-              </li>
-            ))
-          }
-        </ul>
-      </section>
-
-      <section
-        id="businesses"
-        class="scroll-mt-8 px-6 py-24 md:px-12 md:py-32 lg:px-16"
-        aria-labelledby="businesses-heading"
-      >
-        <div class="mb-16 flex max-w-xl flex-col gap-4 md:mb-24">
+        <div class="flex max-w-2xl flex-col gap-6">
           <h2
-            id="businesses-heading"
-            class="font-serif text-4xl leading-tight font-medium md:text-5xl"
+            id="owners-heading"
+            class="font-display text-4xl leading-[1.05] font-semibold tracking-[-0.02em] text-balance md:text-6xl"
           >
-            Negocios
+            ¿Tienes un negocio?
           </h2>
-          <p class="text-sm leading-relaxed text-muted-foreground">
-            Los que ya tienen su tienda en Entregado.
+          <p class="max-w-md text-base leading-relaxed text-foreground/75">
+            Abre tu tienda en Entregado. Tú decides tu catálogo, tu horario y
+            hasta dónde entregas.
           </p>
         </div>
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-5">
+          <a
+            href={`${businessAppUrl}/register`}
+            class="focus-visible:ring-offset-butter inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:outline-none"
+          >
+            Abrir mi tienda
+          </a>
+          <a
+            href={`${businessAppUrl}/login`}
+            class="focus-visible:ring-offset-butter inline-block py-3 text-sm text-foreground/75 underline decoration-primary/40 decoration-2 underline-offset-[6px] transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:outline-none"
+          >
+            Ya tengo cuenta
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
 
-        {
-          businesses.page.length === 0 ? (
-            <p class="max-w-md text-sm leading-relaxed text-muted-foreground">
-              Todavía no hay negocios con su tienda publicada.
-            </p>
-          ) : (
-            <div class="grid gap-x-16 gap-y-24 md:grid-cols-2">
-              {businesses.page.map((business) => (
-                <BusinessCard business={business} />
-              ))}
-            </div>
-          )
-        }
-
-        {
-          cursor !== null || !businesses.isDone ? (
-            <nav
-              class="mt-16 flex items-center justify-between gap-4 border-t border-border pt-6 md:mt-24"
-              aria-label="Paginación de negocios"
-            >
-              {cursor !== null ? (
-                <a
-                  href="/#businesses"
-                  class="text-sm font-medium underline-offset-4 hover:underline"
-                >
-                  Anterior
-                </a>
-              ) : (
-                <span />
-              )}
-              {businesses.isDone ? (
-                <span />
-              ) : (
-                <a
-                  href={businessesNextHref}
-                  class="text-sm font-medium underline-offset-4 hover:underline"
-                >
-                  Siguiente
-                </a>
-              )}
-            </nav>
-          ) : null
-        }
-      </section>
-    </main>
-
-    <SiteFooter />
-  </div>
+  <SiteFooter />
 </Layout>

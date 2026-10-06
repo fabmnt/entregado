@@ -1,26 +1,46 @@
 ---
+import { getBusinessAppUrl } from "../lib/businesses"
+
+const businessAppUrl = getBusinessAppUrl()
 const year = new Date().getFullYear()
+
+const links = [
+  { href: "#businesses", label: "Negocios" },
+  { href: `${businessAppUrl}/register`, label: "Abrir una tienda" },
+  { href: `${businessAppUrl}/login`, label: "Entrar" },
+] as const
 ---
 
-<footer class="mt-auto px-6 py-12 md:px-12 lg:px-16">
-  <div class="h-px bg-border"></div>
+<footer class="mx-auto w-full max-w-7xl px-5 md:px-10">
   <div
-    class="flex flex-col gap-8 pt-10 md:flex-row md:items-end md:justify-between"
+    class="flex flex-col gap-10 py-12 md:flex-row md:items-end md:justify-between"
   >
     <div class="flex flex-col gap-3">
-      <p class="font-serif text-2xl tracking-wide">Entregado</p>
-      <p class="max-w-sm text-sm leading-relaxed text-muted-foreground">
-        Una app de ventas y pedidos para cada negocio.
+      <p
+        class="font-display text-wordmark text-3xl font-medium tracking-[-0.02em]"
+      >
+        Entregado
+      </p>
+      <p class="max-w-xs text-sm leading-relaxed text-muted-foreground">
+        Tiendas propias para los negocios de tu ciudad.
       </p>
     </div>
-    <div class="flex flex-col gap-3 md:items-end">
-      <a
-        href="#businesses"
-        class="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:outline-none"
-      >
-        Negocios
-      </a>
-      <p class="text-sm text-muted-foreground">© {year}</p>
+    <div class="flex flex-col gap-6 md:items-end">
+      <ul class="flex flex-wrap gap-x-8 gap-y-3">
+        {
+          links.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                class="inline-block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background focus-visible:outline-none"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="text-xs text-muted-foreground">© {year} Entregado</p>
     </div>
   </div>
 </footer>

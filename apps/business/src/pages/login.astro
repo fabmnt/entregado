@@ -1,5 +1,4 @@
 ---
-import { buttonVariants } from "@workspace/ui/components/button"
 import {
   Field,
   FieldError,
@@ -7,7 +6,7 @@ import {
   FieldLabel,
 } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/input"
-import Layout from "../layouts/main.astro"
+import AuthShell from "../components/auth-shell.astro"
 import {
   authErrorMessage,
   fieldErrorsFromZod,
@@ -45,71 +44,66 @@ if (Astro.request.method === "POST") {
 }
 ---
 
-<Layout title="Entrar | Entregado">
-  <main class="mx-auto flex min-h-svh w-full max-w-sm flex-col gap-8 p-6">
-    <header class="flex flex-col gap-1">
-      <h1 class="text-xl font-medium">Entrar</h1>
-      <p class="text-sm text-muted-foreground">
-        Repartidor, dueño de negocio o admin general.
-      </p>
-    </header>
-    <form method="post" class="flex flex-col gap-5">
-      {
-        formError ? (
-          <p class="text-sm text-destructive" role="alert">
-            {formError}
-          </p>
-        ) : null
-      }
-      <FieldGroup>
-        <Field data-invalid={fieldErrors.email ? true : undefined}>
-          <FieldLabel htmlFor="email">Correo</FieldLabel>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            defaultValue={email}
-            required
-            aria-invalid={fieldErrors.email ? true : undefined}
-            aria-describedby={fieldErrors.email ? "email-error" : undefined}
-          />
-          {
-            fieldErrors.email ? (
-              <FieldError id="email-error">{fieldErrors.email}</FieldError>
-            ) : null
-          }
-        </Field>
-        <Field data-invalid={fieldErrors.password ? true : undefined}>
-          <FieldLabel htmlFor="password">Contraseña</FieldLabel>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            aria-invalid={fieldErrors.password ? true : undefined}
-            aria-describedby={fieldErrors.password
-              ? "password-error"
-              : undefined}
-          />
-          {
-            fieldErrors.password ? (
-              <FieldError id="password-error">
-                {fieldErrors.password}
-              </FieldError>
-            ) : null
-          }
-        </Field>
-      </FieldGroup>
-      <button class={buttonVariants()} type="submit">Entrar</button>
-    </form>
-    <p class="text-sm text-muted-foreground">
-      ¿No tienes cuenta?
-      <a
-        class="text-foreground underline-offset-4 hover:underline"
-        href="/register">Regístrate</a
-      >
-    </p>
-  </main>
-</Layout>
+<AuthShell
+  title="Entrar | Entregado"
+  heading="Entrar"
+  description="Repartidor, dueño de negocio o admin general."
+>
+  <form method="post" class="flex flex-col gap-6">
+    {
+      formError ? (
+        <p class="text-sm text-destructive" role="alert">
+          {formError}
+        </p>
+      ) : null
+    }
+    <FieldGroup>
+      <Field data-invalid={fieldErrors.email ? true : undefined}>
+        <FieldLabel htmlFor="email">Correo</FieldLabel>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          defaultValue={email}
+          required
+          aria-invalid={fieldErrors.email ? true : undefined}
+          aria-describedby={fieldErrors.email ? "email-error" : undefined}
+        />
+        {
+          fieldErrors.email ? (
+            <FieldError id="email-error">{fieldErrors.email}</FieldError>
+          ) : null
+        }
+      </Field>
+      <Field data-invalid={fieldErrors.password ? true : undefined}>
+        <FieldLabel htmlFor="password">Contraseña</FieldLabel>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          aria-invalid={fieldErrors.password ? true : undefined}
+          aria-describedby={fieldErrors.password ? "password-error" : undefined}
+        />
+        {
+          fieldErrors.password ? (
+            <FieldError id="password-error">{fieldErrors.password}</FieldError>
+          ) : null
+        }
+      </Field>
+    </FieldGroup>
+    <button
+      class="focus-visible:ring-offset-sage inline-flex w-full items-center justify-center rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:outline-none"
+      type="submit">Entrar</button
+    >
+  </form>
+  <Fragment slot="footer">
+    ¿No tienes cuenta?{" "}
+    <a
+      class="decoration-brass text-primary underline decoration-2 underline-offset-[6px]"
+      href="/register">Regístrate</a
+    >
+  </Fragment>
+</AuthShell>

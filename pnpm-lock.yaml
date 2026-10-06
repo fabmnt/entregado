@@ -54,6 +54,9 @@ importers:
       '@entregado/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@fontsource-variable/bodoni-moda':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@types/react':
         specifier: ^19
         version: 19.2.15
@@ -130,6 +133,9 @@ importers:
       '@entregado/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@fontsource-variable/bodoni-moda':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@types/react':
         specifier: ^19
         version: 19.2.15
@@ -1359,6 +1365,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource-variable/bodoni-moda@5.3.0':
+    resolution: {integrity: sha512-yTDXk4+/J8I20KjtkHBbXDQNeE5PR3BZa0gv/YRza+kyxsz+mmg0la/n/hsr6+WvSfVP7Lc8lRTjHGIYwBW43A==}
 
   '@fontsource-variable/cormorant@5.3.0':
     resolution: {integrity: sha512-S3/jFZ2+Erx8ML5+lo71rYKqVpJF13CZ3yWX7xfjQk1wFcPhT9Gp+l2tnNSLOx5Mzjn3mQmVPutpvx91O2VqpQ==}
@@ -6943,6 +6952,8 @@ snapshots:
       react-dom: 19.2.6(react@19.2.6)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource-variable/bodoni-moda@5.3.0': {}
 
   '@fontsource-variable/cormorant@5.3.0': {}
 

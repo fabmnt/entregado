@@ -19,6 +19,7 @@
     "@entregado/backend": "workspace:*",
     "@entregado/types": "workspace:*",
     "@entregado/utils": "workspace:*",
+    "@fontsource-variable/bodoni-moda": "^5.3.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@workspace/ui": "workspace:*",

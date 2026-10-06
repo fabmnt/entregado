@@ -1,0 +1,59 @@
+---
+import { getWebAppUrl } from "../lib/web-url"
+import Layout from "../layouts/main.astro"
+
+interface Props {
+  title: string
+  heading: string
+  description: string
+}
+
+const { title, heading, description } = Astro.props
+const webUrl = getWebAppUrl()
+
+const focusRing =
+  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background focus-visible:outline-none"
+---
+
+<Layout title={title}>
+  <div class="storefront min-h-svh bg-background text-foreground">
+    <header class="border-b border-border">
+      <div
+        class="mx-auto flex w-full max-w-7xl items-center px-5 py-4 md:px-10 md:py-5"
+      >
+        <a
+          href={webUrl}
+          class:list={[
+            "font-display text-2xl leading-none font-semibold tracking-[-0.02em] text-primary md:text-[2rem]",
+            focusRing,
+          ]}
+        >
+          Entregado
+        </a>
+      </div>
+    </header>
+
+    <main
+      class="mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-12 md:py-20"
+    >
+      <div class="flex flex-col gap-4">
+        <h1
+          class="font-display text-[2.6rem] leading-[1.02] font-semibold tracking-[-0.025em] text-primary md:text-6xl"
+        >
+          {heading}
+        </h1>
+        <p class="text-base leading-relaxed text-foreground/75">
+          {description}
+        </p>
+      </div>
+      <div
+        class="bg-sage flex flex-col gap-6 rounded-[2rem] p-6 md:p-8 [&_input]:bg-background"
+      >
+        <slot />
+      </div>
+      <p class="text-sm text-foreground/75">
+        <slot name="footer" />
+      </p>
+    </main>
+  </div>
+</Layout>

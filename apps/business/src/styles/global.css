@@ -1,0 +1,31 @@
+@import "@workspace/ui/globals.css";
+@import "@fontsource-variable/bodoni-moda";
+
+/* Public store palette. It is scoped to `.storefront` so the admin and rider
+   screens keep the shared neutral tokens. Mirrors the directory in apps/web. */
+@theme inline {
+  --font-display: "Bodoni Moda Variable", serif;
+  --color-brass: var(--brass);
+  --color-sage: var(--sage);
+  --color-butter: var(--butter);
+  --color-blush: var(--blush);
+  --color-mint: var(--mint);
+}
+
+.storefront {
+  --background: #fbfaf6;
+  --foreground: #14261f;
+  --card: #fbfaf6;
+  --card-foreground: #14261f;
+  --primary: #17402f;
+  --primary-foreground: #fbfaf6;
+  --muted: #eef0e8;
+  --muted-foreground: #56645d;
+  --border: #dfe3d8;
+  --ring: #17402f;
+  --brass: #b98a2f;
+  --sage: #e5ede0;
+  --butter: #f6e7a9;
+  --blush: #f5dcd2;
+  --mint: #d6eadf;
+}
