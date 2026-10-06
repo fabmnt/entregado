@@ -1,42 +1,64 @@
 ---
-import type { DirectoryBusiness } from "@entregado/types"
+import type { BusinessKind, DirectoryBusiness } from "@entregado/types"
 import { getBusinessAppUrl } from "../lib/businesses"
-import { businessPlaceholderImage, businessPortrait } from "../lib/directory"
+import { businessImage, businessKindLabel } from "../lib/directory"
 
 interface Props {
   business: DirectoryBusiness
 }
 
+// The card color tells the kind of business at a glance.
+const KIND_TONES: Record<BusinessKind, string> = {
+  food: "bg-blush",
+  pharmacy: "bg-mint",
+}
+
 const { business } = Astro.props
-const imageSrc =
-  business.logoUrl ?? businessPlaceholderImage(business.kind, business.slug)
-const portrait = businessPortrait(business)
 const href = `${getBusinessAppUrl()}/${business.slug}`
 ---
 
-<article class="flex flex-col gap-8">
-  <a href={href} class="flex flex-col gap-8">
-    <div class="overflow-hidden bg-muted">
+<article class="h-full">
+  <a
+    href={href}
+    class:list={[
+      "group flex h-full gap-4 rounded-[1.75rem] p-3 ring-offset-4 ring-offset-background transition-transform duration-300 ease-out hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none sm:flex-col sm:gap-0 sm:rounded-[2rem]",
+      KIND_TONES[business.kind],
+    ]}
+  >
+    <div
+      class="w-28 shrink-0 self-start overflow-hidden rounded-t-full rounded-b-[1rem] bg-background/60 sm:w-auto sm:self-auto sm:rounded-b-[1.5rem]"
+    >
       <img
-        src={imageSrc}
-        alt={`Imagen de ${business.name}`}
-        width="1400"
-        height="1750"
+        src={businessImage(business)}
+        alt=""
+        width="1200"
+        height="1500"
         loading="lazy"
-        class="aspect-[4/5] w-full object-cover"
+        decoding="async"
+        class="aspect-[4/5] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
       />
     </div>
-    <div class="flex max-w-md flex-col gap-4">
-      <h3 class="font-serif text-3xl leading-tight font-medium md:text-4xl">
+    <div
+      class="flex min-w-0 flex-1 flex-col gap-2 py-1 pr-1 sm:gap-3 sm:px-3 sm:pt-5 sm:pb-3"
+    >
+      <p
+        class="w-fit rounded-full bg-primary px-2.5 py-0.5 text-[0.7rem] font-medium text-primary-foreground"
+      >
+        {businessKindLabel(business.kind)}
+      </p>
+      <h3
+        class="font-display text-[1.35rem] leading-tight font-bold tracking-[-0.01em] text-primary sm:text-[1.65rem]"
+      >
         {business.name}
       </h3>
-      {
-        portrait.map((paragraph) => (
-          <p class="text-sm leading-relaxed text-muted-foreground">
-            {paragraph}
-          </p>
-        ))
-      }
+      <p class="text-sm leading-relaxed text-foreground/75">
+        {business.description}
+      </p>
+      <p
+        class="decoration-brass mt-auto pt-1 text-sm font-medium text-primary underline decoration-2 underline-offset-[6px] group-hover:decoration-primary sm:pt-3"
+      >
+        Ver tienda
+      </p>
     </div>
   </a>
 </article>

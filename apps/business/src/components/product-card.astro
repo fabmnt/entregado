@@ -1,0 +1,62 @@
+---
+import { formatCordoba } from "@entregado/utils"
+import type { StoreProduct } from "@entregado/types"
+
+interface Props {
+  product: StoreProduct
+}
+
+const { product } = Astro.props
+---
+
+<li
+  id={`product-${product.id}`}
+  class="bg-sage flex scroll-mt-28 flex-col rounded-[2rem] p-3"
+>
+  {
+    product.photoUrl ? (
+      <div class="overflow-hidden rounded-[1.5rem] bg-background/60">
+        <img
+          src={product.photoUrl}
+          alt={`Foto de ${product.name}`}
+          width="1200"
+          height="900"
+          loading="lazy"
+          decoding="async"
+          class="aspect-[4/3] w-full object-cover"
+        />
+      </div>
+    ) : null
+  }
+  <div class="flex flex-1 flex-col gap-2 px-3 pt-5 pb-3">
+    <h3
+      class="font-display text-[1.4rem] leading-tight font-bold tracking-[-0.01em] text-primary"
+    >
+      {product.name}
+    </h3>
+    {
+      product.description ? (
+        <p class="text-sm leading-relaxed text-foreground/75">
+          {product.description}
+        </p>
+      ) : null
+    }
+    <div class="mt-auto flex items-center justify-between gap-4 pt-4">
+      <p class="font-display text-xl font-semibold text-primary lining-nums">
+        {formatCordoba(product.price)}
+      </p>
+      <form method="post">
+        <input type="hidden" name="productId" value={product.id} />
+        <button
+          type="submit"
+          name="intent"
+          value="add"
+          aria-label={`Agregar ${product.name}`}
+          class="focus-visible:ring-offset-sage rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:outline-none"
+        >
+          Agregar
+        </button>
+      </form>
+    </div>
+  </div>
+</li>

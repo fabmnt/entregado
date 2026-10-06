@@ -49,7 +49,7 @@ function selectPort(
 
 // Unique to each app: the business register page and the web directory copy.
 const BUSINESS_APP_MARKER = "Crear cuenta"
-const WEB_APP_MARKER = "Una tienda por negocio"
+const WEB_APP_MARKER = "Los negocios que te gustan"
 
 const WEB_PORT_CANONICAL = 4321
 const BUSINESS_PORT_CANONICAL = 4322

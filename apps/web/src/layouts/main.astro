@@ -1,5 +1,5 @@
 ---
-import "@workspace/ui/globals.css"
+import "../styles/global.css"
 
 interface Props {
   title?: string
@@ -15,8 +15,9 @@ const {
 <html lang="es" class="scroll-smooth">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#fbfaf6" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>

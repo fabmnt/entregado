@@ -9,17 +9,20 @@ function isInvalidCursorError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("InvalidCursor")
 }
 
-export async function listBusinesses(cursor: string | null) {
+export async function listBusinesses(
+  cursor: string | null,
+  pageSize = DIRECTORY_PAGE_SIZE
+) {
   try {
     return await getConvexClient().query(api.businesses.list, {
-      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor },
+      paginationOpts: { numItems: pageSize, cursor },
     })
   } catch (error) {
     if (cursor === null || !isInvalidCursorError(error)) {
       throw error
     }
     return await getConvexClient().query(api.businesses.list, {
-      paginationOpts: { numItems: DIRECTORY_PAGE_SIZE, cursor: null },
+      paginationOpts: { numItems: pageSize, cursor: null },
     })
   }
 }
