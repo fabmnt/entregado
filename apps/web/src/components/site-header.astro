@@ -37,7 +37,7 @@ const focusRing =
           <a
             href={`${businessAppUrl}/login`}
             class:list={[
-              "inline-flex items-center rounded-full border border-primary/25 px-4 py-2 text-sm text-primary transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground",
+              "site-cta inline-flex items-center rounded-full border border-primary/25 px-4 py-2 text-sm text-primary transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground",
               focusRing,
             ]}
           >
@@ -48,3 +48,35 @@ const focusRing =
     </nav>
   </div>
 </header>
+
+<script>
+  const SCROLLED_OFFSET = 8
+
+  const header = document.querySelector(".site-header")
+  const lightSections = document.querySelectorAll("[data-header-light]")
+
+  function updateTone() {
+    if (!(header instanceof HTMLElement)) return
+    const bar = header.getBoundingClientRect()
+    const overLightSection = [...lightSections].some((section) => {
+      const rect = section.getBoundingClientRect()
+      return rect.top < bar.bottom && rect.bottom > bar.top
+    })
+    if (overLightSection) {
+      header.dataset.tone = "light"
+    } else {
+      header.dataset.tone = window.scrollY > SCROLLED_OFFSET ? "green" : "top"
+    }
+  }
+
+  let frame = 0
+  window.addEventListener(
+    "scroll",
+    () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(updateTone)
+    },
+    { passive: true }
+  )
+  updateTone()
+</script>
